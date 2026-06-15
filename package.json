@@ -1,0 +1,30 @@
+{
+  "name": "justifi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Justifi — helps self-represented litigants prepare a court-ready case for Singapore's Small Claims Tribunal. Powered by Agnes AI, grounded in the State Courts Guide to Small Claims.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0",
+    "next": "^15.1.6",
+    "openai": "^4.80.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "prisma": "^6.3.0",
+    "typescript": "^5.7.3"
+  }
+}

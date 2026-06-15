@@ -1,0 +1,62 @@
+// Justifi data model (agent.md §5). The Lead owns this file — change via PR.
+// Scope (2026-06-15): supports Feature 2 (Evidence + audio) and Feature 6
+// (Hearing script + mock Q&A). PDPA: store the minimum; never log raw narratives.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Pooled connection (Supabase PgBouncer, port 6543) used at runtime.
+  url       = env("DATABASE_URL")
+  // Direct connection (port 5432) used by `prisma db push` / migrations.
+  directUrl = env("DIRECT_URL")
+}
+
+model Case {
+  id        String   @id @default(cuid())
+  title     String?
+  status    String   @default("draft")
+
+  // Feature 6 — witness statement input + generated hearing script (HearingScript).
+  statement     String?
+  hearingScript Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  evidence Evidence[]
+  facts    MaterialFact[]
+}
+
+model Evidence {
+  id             String        @id @default(cuid())
+  caseId         String
+  case           Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  // "image" | "audio" — see EvidenceKind in lib/types.ts.
+  kind           String
+  sourceFile     String
+  // Structured extract: EvidenceExtract (image) or Transcript (audio).
+  extract        Json?
+  evidenceLinked Boolean       @default(false)
+  // Optional link to the material fact this evidence supports.
+  factId         String?
+  fact           MaterialFact? @relation(fields: [factId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([caseId])
+}
+
+model MaterialFact {
+  id             String     @id @default(cuid())
+  caseId         String
+  case           Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  statement      String
+  sourceQuote    String?
+  evidenceLinked Boolean    @default(false)
+  evidence       Evidence[]
+  createdAt      DateTime   @default(now())
+
+  @@index([caseId])
+}
