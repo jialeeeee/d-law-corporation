@@ -68,7 +68,8 @@ scope for now.
 - **Agnes (OpenAI-compatible):** base URL `https://apihub.agnes-ai.com/v1`
   - text/vision: `agnes-2.0-flash` · image: `agnes-image-2.1-flash` / `agnes-image-2.0-flash` · video: `agnes-video-v2.0`
   - audio transcription: **unconfirmed** — see Track A (F2).
-- **Commands:** `npm run dev` · `npm run build` · `npm run db:push`
+- **Commands:** `npm run dev` · `npm run build` · `npm run db:push` (the db scripts are wrapped with `dotenv-cli` so they read `.env.local`, which Prisma's CLI otherwise ignores).
+- **Env:** put secrets in `.env.local` (git-ignored; copy from `.env.example`). Needed to run against the real DB/Agnes — ask the Lead for the values.
 - **Path alias:** `@/*` → repo root (already set in `tsconfig.json`).
 
 ---
@@ -156,7 +157,11 @@ or `prisma/schema.prisma`? Ping Jun Sheng for a quick PR.
 env, deploy, **merge coordination.** The Agnes client (incl. a swappable `transcribe()`), the locked
 types, the ruleset and the schema are pushed to `main`. This unblocks everyone.
 
-### Auth — Lead (`feat/auth`)
+### Auth — Lead (`feat/auth`) — ✅ backend verified working
+**Status:** the Supabase project is provisioned and the auth **backend is verified end-to-end**
+(register → auto-profile trigger → login, plus wrong-password / non-existent / duplicate rejection,
+all green). "Confirm email" is OFF in Supabase, so signup returns a session and routes to `/wizard`.
+What's left is the **UI** (Donna) and wiring case creation to `userId`.
 **Owns:** `lib/supabase/*`, `lib/auth.ts`, `middleware.ts`, `app/(auth)/*`, `app/auth/confirm/*`,
 the `Profile` model + `Case.userId` schema field, `supabase/migrations/*`.
 Supabase Auth (email/password) via `@supabase/ssr`. `/login` + `/register` are server actions
@@ -348,7 +353,8 @@ git checkout feat/<yours> && git merge main
 ## 8. Build order
 
 1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema, and
-   Supabase Auth (login/registration) with `Case.userId`.
+   Supabase Auth (login/registration) with `Case.userId`. The Supabase DB is provisioned and the
+   auth backend is verified working (tables/trigger/RLS live); the db scripts read `.env.local`.
 2. Track A (`feat/evidence-audio`) and Track B (`feat/court-appearance`) build in parallel against
    the locked contracts (frontend can use mocks immediately), scoping data by the signed-in `userId`.
 3. P5 surfaces both features in `app/(web)`, behind login.
