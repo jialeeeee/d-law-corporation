@@ -14,8 +14,9 @@ scope, the per-track specs, and the git workflow. AI coding agents should read i
 
 Two features are in scope (the rest are deferred — see `agent.md`):
 
-- **F2 — Evidence organiser + audio transcription** (`feat/evidence-audio`): image transcript,
-  summary, timeline of dated events, fact↔evidence linking, non-English flagging, audio → transcript.
+- **F2 — Evidence organiser** (`feat/evidence-docs` for images+documents; `feat/evidence-audio` for
+  audio): extract text from images, PDFs, Word docs and audio; summary, timeline of dated events,
+  fact↔evidence linking, non-English flagging, a quality flag for poor uploads, transcript download.
 - **F6 — Hearing script + mock Q&A** (`feat/court-appearance`): witness statement → hearing script;
   iterative mock Tribunal Q&A.
 
@@ -71,13 +72,14 @@ You can build and run most of the app without a database; only routes that persi
 
 ```
 app/                 Next.js App Router (pages + /api routes)
-  api/evidence       F2 — vision extract        (stub: implement on feat/evidence-audio)
+  api/evidence       F2 — image + document extract (DONE on feat/evidence-docs)
   api/transcribe     F2 — audio transcription   (stub: implement on feat/evidence-audio)
   api/hearing-script F6 — hearing script        (stub: implement on feat/court-appearance)
   api/mock-qa        F6 — mock Q&A              (stub: implement on feat/court-appearance)
-  (web)/             P5 — UI surfacing the features (wizard flow)
+  (web)/wizard       P5 — UI; step 1 (evidence upload) is live
 lib/types.ts         Shared contracts (Lead owns — change via PR)
 lib/agnes/           Agnes client: chatJson / visionJson / transcribe + parseJson
+lib/evidence/        F2 document text extraction (pdf-parse / mammoth)
 lib/sct/ruleset.ts   SCT grounding — pass rulesetToPrompt() into every SCT prompt
 lib/db.ts            Prisma client singleton
 prisma/schema.prisma Data model (Lead owns — change via PR)
