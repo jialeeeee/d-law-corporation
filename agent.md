@@ -124,7 +124,17 @@ there via a tiny PR**, then you import it. Active types:
 
 ## 4. Work split — active tracks
 
-> Assign owners by strength. Give the UX-leaning person the wizard (P5) surfacing.
+**Claim your track here (fill in names), then build only inside that track's folder:**
+
+| Track | Branch | Folder you own | Owner |
+| --- | --- | --- | --- |
+| A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | _(name)_ |
+| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | _(name)_ |
+| P5 — Wizard UI | `feat/wizard` | `app/(wizard)/*` | _(name)_ |
+| Foundation + merges | `main` | `lib/*`, `prisma/*` | Lead (you) |
+
+If two people are on one track, split by endpoint (e.g. one takes `/api/evidence`, the other
+`/api/transcribe`). The UX-leaning person should take P5. **Don't edit another track's folder.**
 
 ### Foundation — Lead (DONE, on `main`)
 **Owns:** `lib/types.ts`, `lib/agnes/*`, `lib/sct/ruleset.ts`, `lib/db.ts`, `prisma/schema.prisma`,
@@ -160,6 +170,71 @@ call `setTranscribeProvider()` (Whisper / AssemblyAI / local) so the feature shi
 
 ### P5 — Wizard UI
 **Owns:** `app/(wizard)/*`. Surface the two active features as steps/tabs; call the routes above.
+
+---
+
+## 4a. How to implement your endpoint (worked example)
+
+Every API route follows the same shape: **parse the request → build a grounded prompt →
+call an Agnes helper → return typed JSON.** Open your `route.ts` stub (it has a 501 + a TODO
+listing the exact request/response types) and replace it using this pattern.
+
+Worked example — `app/api/hearing-script/route.ts` (Track B):
+
+```ts
+import { NextResponse } from "next/server";
+import { chatJson } from "@/lib/agnes/client";
+import { rulesetToPrompt, INDICATIVE_NOTE } from "@/lib/sct/ruleset";
+import type { HearingScript, HearingScriptRequest } from "@/lib/types";
+
+export async function POST(req: Request) {
+  // 1) Parse + validate the request (shape is in lib/types.ts).
+  const { statement } = (await req.json()) as HearingScriptRequest;
+  if (!statement?.trim()) {
+    return NextResponse.json({ error: "statement is required" }, { status: 400 });
+  }
+
+  // 2) Build a grounded, JSON-only prompt. ALWAYS include rulesetToPrompt() (§0.3).
+  const result = await chatJson<HearingScript>({
+    system: [
+      rulesetToPrompt(),
+      "Help the litigant structure their OWN witness statement into a hearing script.",
+      "Use ONLY facts present in the statement; invent nothing (§0.5).",
+      "Return JSON: { opening, chronology:[{ heading, content, evidenceRefs? }], reliefSought, indicativeNote }",
+    ].join("\n"),
+    user: statement,
+  });
+
+  // 3) Return typed JSON; always attach the not-advice line (§0.1).
+  return NextResponse.json({ ...result, indicativeNote: INDICATIVE_NOTE });
+}
+```
+
+- **Track A (evidence)** is the same shape but uses `visionJson({ prompt, imageUrl })`, and
+  `transcribe()` first for audio. See the TODO in each stub.
+- **Mock + real (DoD §7).** To develop without burning Agnes calls, short-circuit with a fixture
+  when a flag is set, e.g. at the top of the handler:
+  ```ts
+  if (process.env.USE_MOCK === "1") return NextResponse.json(MOCK_HEARING_SCRIPT);
+  ```
+  Demo with `USE_MOCK=1` for the mock and unset for the real Agnes call.
+
+**Test it locally** — run `npm run dev`, then in a second terminal:
+
+```powershell
+# PowerShell (Windows)
+Invoke-RestMethod -Uri http://localhost:3000/api/hearing-script -Method Post `
+  -ContentType 'application/json' `
+  -Body '{"statement":"On 3 Jan 2026 I paid ABC Pte Ltd $2,000 for repairs never completed."}'
+```
+```bash
+# Git Bash / curl
+curl -s -X POST http://localhost:3000/api/hearing-script \
+  -H "Content-Type: application/json" \
+  -d '{"statement":"On 3 Jan 2026 I paid ABC Pte Ltd $2,000 for repairs never completed."}'
+```
+
+Before opening a PR, run `npm run build` (it type-checks everything) and the §7 checklist.
 
 ---
 

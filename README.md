@@ -21,13 +21,17 @@ Two features are in scope (the rest are deferred — see `agent.md`):
 
 ## Getting started
 
+**Prerequisites:** Node.js 20+ and npm (check with `node -v`). Git. That's it — no global installs.
+
 ```bash
 git clone https://github.com/jialeeeee/d-law-corporation.git
 cd d-law-corporation
 npm install                 # also runs `prisma generate`
-cp .env.example .env.local  # then fill in the values (see below)
+cp .env.example .env.local  # PowerShell: Copy-Item .env.example .env.local
 npm run dev                 # http://localhost:3000
 ```
+
+Then fill in `.env.local` (see below) and confirm it runs: open http://localhost:3000.
 
 ### Environment (`.env.local`)
 
@@ -40,7 +44,9 @@ Copy `.env.example` and fill in:
 | `DATABASE_URL` | Supabase pooled connection (port 6543) | Used at runtime. |
 | `DIRECT_URL` | Supabase direct connection (port 5432) | Used by `prisma db push`. |
 
-`.env.local` is git-ignored — **never commit real secrets.**
+`.env.local` is git-ignored — **never commit real secrets.** Ask the Lead for the real
+`AGNES_KEY` and Supabase URLs (shared out-of-band, not via git). The app builds and the dev
+server starts without them; routes that call Agnes/DB only fail when you actually hit them.
 
 ### Database
 
@@ -81,7 +87,23 @@ The API routes ship as **501 stubs** with TODO comments pointing at the contract
 Pick up your track's stub and build it out. Work only inside your own folder; ping the Lead for any
 change to `lib/types.ts` or `prisma/schema.prisma`.
 
-## Contributing
+## Pick up your track (groupmates start here)
 
-Branch from `main`, keep PRs small, and run through the Definition of Done in `agent.md` §7 before
-requesting review.
+1. **Read [`agent.md`](agent.md)** — at minimum the SCOPE banner, §0 non-negotiables, and §4 (the
+   ownership table — put your name on a track).
+2. **Branch from `main`** for your track:
+   ```bash
+   git checkout main && git pull
+   git checkout -b feat/evidence-audio   # or feat/court-appearance / feat/wizard
+   git push -u origin feat/evidence-audio
+   ```
+3. **Open your stub** (e.g. `app/api/evidence/route.ts`). It returns 501 with a TODO listing the
+   exact request/response types to use. **Implement it following the worked example in `agent.md` §4a**
+   (parse request → ground with `rulesetToPrompt()` → call an Agnes helper → return typed JSON).
+4. **Test locally** with the curl/PowerShell snippets in `agent.md` §4a.
+5. **Before a PR:** run `npm run build` (type-checks everything) and tick the Definition of Done in
+   `agent.md` §7. Keep PRs small; get 1 teammate review before merging to `main`.
+
+**Stay in your own folder.** The only shared files are `lib/types.ts` and `prisma/schema.prisma`
+(Lead-owned) — need a change there? Ping the Lead for a quick PR. Pull `main` daily so branches
+don't drift.
