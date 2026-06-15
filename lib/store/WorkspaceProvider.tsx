@@ -1,8 +1,8 @@
 "use client";
 
-// React context wrapping the workspace store. Hydrates from localStorage on
-// mount (SSR-safe), persists on every change, and exposes typed actions + the
-// active case to the whole app via the useWorkspace() hook.
+// React context wrapping the workspace store. Hydrates from the database on
+// mount (via server actions), persists changes back (debounced), and exposes
+// typed actions + the active case to the whole app via the useWorkspace() hook.
 
 import {
   createContext,
@@ -18,11 +18,10 @@ import type { CaseData, Preferences, WorkspaceState } from "./types";
 import {
   createCase as createCaseFn,
   deleteCase as deleteCaseFn,
-  loadWorkspace,
-  saveWorkspace,
   updateCase,
   DEFAULT_PREFS,
 } from "./store";
+import { loadWorkspaceAction, saveWorkspaceAction } from "./actions";
 import { seedCases } from "./demo";
 
 interface WorkspaceCtx {
@@ -53,16 +52,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const hydrated = useRef(false);
 
-  // Hydrate once on mount.
+  // Hydrate once on mount from the database. If it's unreachable, fall back to
+  // the in-memory blank case so the workspace still renders.
   useEffect(() => {
-    setState(loadWorkspace());
-    hydrated.current = true;
-    setReady(true);
+    let alive = true;
+    void loadWorkspaceAction().then((loaded) => {
+      if (!alive) return;
+      if (loaded) setState(loaded);
+      hydrated.current = true;
+      setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  // Persist after hydration (never clobber storage with the pre-hydration seed).
+  // Persist after hydration (never clobber the DB with the pre-hydration seed).
+  // Debounced so rapid edits (typing, toggling) collapse into one write.
   useEffect(() => {
-    if (hydrated.current) saveWorkspace(state);
+    if (!hydrated.current) return;
+    const t = setTimeout(() => {
+      void saveWorkspaceAction(state);
+    }, 600);
+    return () => clearTimeout(t);
   }, [state]);
 
   const setActiveCase = useCallback((id: string) => {

@@ -3,7 +3,7 @@
 // The Hearing Prep workspace shell: persistent top bar + sidebar, the active
 // view, the evidence slide-over and the global toast. View switching is local
 // state (the design is a single-page view switch); data lives in the workspace
-// store (localStorage today). Renders nothing case-specific until hydrated.
+// store (database-backed). Renders nothing case-specific until hydrated.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWorkspace } from "@/lib/store/WorkspaceProvider";

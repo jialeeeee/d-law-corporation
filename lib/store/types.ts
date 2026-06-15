@@ -2,9 +2,9 @@
 //
 // This is the shape the workspace UI reads/writes. It is intentionally separate
 // from the server contracts in lib/types.ts (EvidenceExtract / HearingScript /
-// etc.) so the UI has one stable, display-oriented model. The store
-// (lib/store/store.ts) persists this to localStorage today; swapping to the
-// Supabase/Prisma backend later only touches the store, not the UI.
+// etc.) so the UI has one stable, display-oriented model. The store persists
+// this to the database (lib/store/actions.ts maps it to the Prisma Case row),
+// so the model stays UI-shaped while the DB is the source of truth.
 
 import type { HearingScript } from "@/lib/types";
 

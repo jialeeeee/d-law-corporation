@@ -65,12 +65,20 @@ function emptyCase(
   };
 }
 
+/** Generate a unique client-side case id (avoids a cycle with store.ts). */
+function caseId(): string {
+  return `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** A single blank case with a unique id — used to seed a user's empty workspace. */
+export function blankCase(): CaseData {
+  const year = new Date().getFullYear();
+  return emptyCase(caseId(), { title: "Untitled case", caseNo: `SCT 0001 / ${year}` });
+}
+
 /** The initial set of cases for a brand-new workspace: one blank case to fill in. */
 export function seedCases(): CaseData[] {
-  const year = new Date().getFullYear();
-  return [
-    emptyCase("c-1", { title: "Untitled case", caseNo: `SCT 0001 / ${year}` }),
-  ];
+  return [blankCase()];
 }
 
 /** Build a fresh, empty case for the "Create a new case" flow. */

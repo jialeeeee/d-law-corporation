@@ -1,9 +1,9 @@
-// Persistence + derivation for the Hearing Prep workspace.
+// Derivation + pure state helpers for the Hearing Prep workspace.
 //
-// Today this is localStorage-backed (no auth/DB dependency — works immediately
-// and survives reload). The whole surface is these pure functions, so wiring the
-// Supabase/Prisma backend later is a localized change: reimplement load/save and
-// the create/delete helpers to call the API, and the UI is untouched.
+// Persistence now lives in the database (lib/store/actions.ts) — there is no
+// localStorage and no seeded demo data. These functions are the pure, UI-facing
+// surface: id generation, immutable case create/update/delete, and the
+// timeline / fact / readiness derivations the views render.
 
 import type {
   CaseData,
@@ -15,46 +15,11 @@ import type {
 } from "./types";
 import { seedCases, newCase as buildNewCase } from "./demo";
 
-const STORAGE_KEY = "dlaw.workspace.v2";
-
 export const DEFAULT_PREFS: Preferences = {
   dark: false,
   reminders: true,
   language: "English",
 };
-
-function freshState(): WorkspaceState {
-  const cases = seedCases();
-  return { cases, activeCaseId: cases[0].meta.id, prefs: { ...DEFAULT_PREFS } };
-}
-
-/** Load the workspace from localStorage (or seed it on first run). SSR-safe. */
-export function loadWorkspace(): WorkspaceState {
-  if (typeof window === "undefined") return freshState();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return freshState();
-    const parsed = JSON.parse(raw) as Partial<WorkspaceState>;
-    if (!parsed.cases || parsed.cases.length === 0) return freshState();
-    return {
-      cases: parsed.cases,
-      activeCaseId: parsed.activeCaseId ?? parsed.cases[0].meta.id,
-      prefs: { ...DEFAULT_PREFS, ...(parsed.prefs ?? {}) },
-    };
-  } catch {
-    return freshState();
-  }
-}
-
-/** Persist the workspace. No-op on the server. */
-export function saveWorkspace(state: WorkspaceState): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Quota / private-mode — fail quietly; the session still works in memory.
-  }
-}
 
 export function genId(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
