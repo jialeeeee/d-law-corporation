@@ -124,17 +124,18 @@ there via a tiny PR**, then you import it. Active types:
 
 ## 4. Work split — active tracks
 
-**Claim your track here (fill in names), then build only inside that track's folder:**
+**Team assignments — build only inside your track's folder** (suggested split; swap to match strengths):
 
 | Track | Branch | Folder you own | Owner |
 | --- | --- | --- | --- |
-| A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | _(name)_ |
-| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | _(name)_ |
-| P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | _(name)_ |
-| Foundation + merges | `main` | `lib/*`, `prisma/*` | Lead (you) |
+| A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | **Jing Yuan** → `/api/evidence` · **Damien** → `/api/transcribe` |
+| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | **Jia Le** |
+| P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | **Donna** |
+| Foundation + merges | `main` | `lib/*`, `prisma/*` | **Jun Sheng** (Lead) |
 
-If two people are on one track, split by endpoint (e.g. one takes `/api/evidence`, the other
-`/api/transcribe`). The UX-leaning person should take P5. **Don't edit another track's folder.**
+Jing Yuan & Damien share the `feat/evidence-audio` branch, split by endpoint as shown; everyone
+else owns their track solo. **Don't edit another track's folder** — need a change in `lib/types.ts`
+or `prisma/schema.prisma`? Ping Jun Sheng for a quick PR.
 
 ### Foundation — Lead (DONE, on `main`)
 **Owns:** `lib/types.ts`, `lib/agnes/*`, `lib/sct/ruleset.ts`, `lib/db.ts`, `prisma/schema.prisma`,
