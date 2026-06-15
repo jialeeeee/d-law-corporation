@@ -104,7 +104,7 @@ app/api/evidence ........... F2 (vision) — ACTIVE
 app/api/transcribe ......... F2 (audio) — ACTIVE
 app/api/hearing-script ..... F6 — ACTIVE
 app/api/mock-qa ............ F6 — ACTIVE
-app/(wizard) ............... UI that surfaces the active features (P5)
+app/(web) .................. UI that surfaces the active features (P5 wizard flow)
 ```
 
 Rule of thumb: **work only inside your own folder.** The only shared files are
@@ -130,7 +130,7 @@ there via a tiny PR**, then you import it. Active types:
 | --- | --- | --- | --- |
 | A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | _(name)_ |
 | B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | _(name)_ |
-| P5 — Wizard UI | `feat/wizard` | `app/(wizard)/*` | _(name)_ |
+| P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | _(name)_ |
 | Foundation + merges | `main` | `lib/*`, `prisma/*` | Lead (you) |
 
 If two people are on one track, split by endpoint (e.g. one takes `/api/evidence`, the other
@@ -169,7 +169,7 @@ call `setTranscribeProvider()` (Whisper / AssemblyAI / local) so the feature shi
 **Done when:** script derived only from the statement; mock Q&A loops with constructive feedback; all carry the not-advice note.
 
 ### P5 — Wizard UI
-**Owns:** `app/(wizard)/*`. Surface the two active features as steps/tabs; call the routes above.
+**Owns:** `app/(web)/*`. Surface the two active features as steps/tabs; call the routes above.
 
 ---
 
@@ -305,5 +305,5 @@ git checkout feat/<yours> && git merge main
 1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema.
 2. Track A (`feat/evidence-audio`) and Track B (`feat/court-appearance`) build in parallel against
    the locked contracts (frontend can use mocks immediately).
-3. P5 surfaces both features in `app/(wizard)`.
+3. P5 surfaces both features in `app/(web)`.
 4. Small PRs into `main` throughout; integrate continuously, not at the end.

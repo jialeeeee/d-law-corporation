@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { INDICATIVE_NOTE } from "@/lib/sct/ruleset";
 
-// Wizard shell (P5). Owner: surface each active feature as a step/tab here.
-export default function WizardLayout({ children }: { children: ReactNode }) {
+// Shared shell for public web pages (route group `(web)`). Carries the
+// not-advice banner. P5 owner: surface each active feature as a step/tab here.
+export default function WebLayout({ children }: { children: ReactNode }) {
   return (
     <main>
       {children}

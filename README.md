@@ -75,7 +75,7 @@ app/                 Next.js App Router (pages + /api routes)
   api/transcribe     F2 — audio transcription   (stub: implement on feat/evidence-audio)
   api/hearing-script F6 — hearing script        (stub: implement on feat/court-appearance)
   api/mock-qa        F6 — mock Q&A              (stub: implement on feat/court-appearance)
-  (wizard)/          P5 — UI surfacing the features
+  (web)/             P5 — UI surfacing the features (wizard flow)
 lib/types.ts         Shared contracts (Lead owns — change via PR)
 lib/agnes/           Agnes client: chatJson / visionJson / transcribe + parseJson
 lib/sct/ruleset.ts   SCT grounding — pass rulesetToPrompt() into every SCT prompt
