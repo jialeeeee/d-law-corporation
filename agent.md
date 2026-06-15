@@ -27,9 +27,15 @@ The team narrowed scope. **Only two features are active.** Do NOT build the defe
 text in the image), a **timeline** of dated events, and a **summary** — see `EvidenceExtract`
 in `lib/types.ts`.
 
-The foundation (Next.js scaffold, Agnes client, ruleset, Prisma schema, shared types) is already
-on `main`. The §0 non-negotiables below still apply in full. Deferred features keep their original
-spec in Section 4 for if/when they return, but are out of scope for now.
+The foundation (Next.js scaffold, Agnes client, ruleset, Prisma schema, shared types) **and a
+Supabase Auth login/registration system** are on `main`. The §0 non-negotiables below still apply in
+full. Deferred features keep their original spec in Section 4 for if/when they return, but are out of
+scope for now.
+
+> **Auth (added 2026-06-15):** users register / sign in before creating a case and uploading
+> evidence. It's foundational infrastructure (Lead-owned — see §4 Auth track and §5a). Because
+> Prisma bypasses Supabase RLS, **every feature must scope `Case`/`Evidence` queries by the
+> signed-in `userId`.** Resolve it server-side with `getCurrentUser()` (`lib/supabase/server.ts`).
 
 ---
 
@@ -61,7 +67,7 @@ spec in Section 4 for if/when they return, but are out of scope for now.
 - **Auth:** Supabase Auth (email/password) via `@supabase/ssr`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (these two are browser-safe, unlike `AGNES_KEY`/`DATABASE_URL`).
 - **Agnes (OpenAI-compatible):** base URL `https://apihub.agnes-ai.com/v1`
   - text/vision: `agnes-2.0-flash` · image: `agnes-image-2.1-flash` / `agnes-image-2.0-flash` · video: `agnes-video-v2.0`
-  - audio transcription: **unconfirmed** — see Track 3 (F2).
+  - audio transcription: **unconfirmed** — see Track A (F2).
 - **Commands:** `npm run dev` · `npm run build` · `npm run db:push`
 - **Path alias:** `@/*` → repo root (already set in `tsconfig.json`).
 
@@ -326,8 +332,11 @@ git checkout feat/<yours> && git merge main
 
 ## 8. Build order
 
-1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema.
+1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema, and
+   Supabase Auth (login/registration) with `Case.userId`.
 2. Track A (`feat/evidence-audio`) and Track B (`feat/court-appearance`) build in parallel against
-   the locked contracts (frontend can use mocks immediately).
-3. P5 surfaces both features in `app/(web)`.
+   the locked contracts (frontend can use mocks immediately), scoping data by the signed-in `userId`.
+3. P5 surfaces both features in `app/(web)`, behind login.
 4. Small PRs into `main` throughout; integrate continuously, not at the end.
+
+> After pulling `main`, run `npm install` — `main` now includes the Supabase deps.
