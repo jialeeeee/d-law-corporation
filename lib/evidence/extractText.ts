@@ -89,7 +89,13 @@ async function extractPdf(buf: Buffer): Promise<TextExtraction> {
   let text: string;
   try {
     const res = await parser.getText();
-    text = cleanText(res.text ?? "");
+    // pdf-parse inserts page separators like "-- 1 of 3 --"; drop them so the
+    // extracted text reads as the original document.
+    const withoutPageMarkers = (res.text ?? "").replace(
+      /^\s*--\s*\d+\s*of\s*\d+\s*--\s*$/gim,
+      "",
+    );
+    text = cleanText(withoutPageMarkers);
   } finally {
     await parser.destroy();
   }
