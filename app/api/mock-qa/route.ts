@@ -49,7 +49,7 @@ function buildEvidencePrompt(evidence: Array<EvidenceExtract | Transcript>): str
         `Amounts: ${e.amounts.join(", ") || "none"}\n` +
         `Names: ${e.names.join(", ") || "none"}`;
 
-      if (e.kind === "image") return base + `\nExtracted text: ${e.extractedText}`;
+      if (e.kind !== "audio") return base + `\nExtracted text: ${e.extractedText}`;
       return base + `\nTranscript: ${e.transcript}`;
     })
     .join("\n\n");
