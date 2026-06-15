@@ -1,32 +1,27 @@
 import { NextResponse } from "next/server";
 import { chatJson } from "@/lib/agnes/client";
 import { rulesetToPrompt, INDICATIVE_NOTE } from "@/lib/sct/ruleset";
-import type {
-  HearingScript,
-  HearingScriptRequest,
-  EvidenceExtract,
-  Transcript,
-} from "@/lib/types";
+import type { HearingScript, EvidenceExtract, Transcript } from "@/lib/types";
 
-// Extends the base request to accept optional evidence from Track A (F2).
-// The UI compiles the litigant's statement + uploaded evidence extracts and
-// sends them together so the script can reference actual evidence.
-type RequestBody = HearingScriptRequest & {
-  evidence?: Array<EvidenceExtract | Transcript>;
-};
+// New request shape — takes Track A evidence output directly.
+// statement is kept as an optional fallback if the UI wants to pass one.
+export interface HearingScriptFromEvidenceRequest {
+  evidence: Array<EvidenceExtract | Transcript>;
+  statement?: string;
+}
 
 const MOCK_HEARING_SCRIPT: HearingScript = {
   opening:
     "My name is John Tan. On 3 January 2026 I engaged ABC Pte Ltd to carry out " +
-    "renovation works at my home for $8,000. The works were never completed despite " +
+    "renovation works at my home for $2,000. The works were never completed despite " +
     "full payment, and I am seeking a full refund.",
   chronology: [
     {
       heading: "Contract and Payment",
       content:
         "On 3 January 2026, I signed a contract with ABC Pte Ltd for renovation " +
-        "works totalling $8,000. I transferred the full amount on the same day.",
-      evidenceRefs: ["bank_transfer_jan2026.pdf"],
+        "works totalling $2,000. I transferred the full amount on the same day.",
+      evidenceRefs: ["invoice.png"],
     },
     {
       heading: "Works Not Commenced",
@@ -40,33 +35,35 @@ const MOCK_HEARING_SCRIPT: HearingScript = {
       content:
         "I sent a formal demand letter on 20 January 2026 requesting either " +
         "commencement of works or a full refund. No response was received.",
-      evidenceRefs: ["demand_letter_jan2026.pdf"],
+      evidenceRefs: ["demand_letter.pdf"],
     },
   ],
   reliefSought:
-    "I seek a full refund of $8,000 being the contract price paid for works " +
+    "I seek a full refund of $2,000 being the contract price paid for works " +
     "that were never performed.",
   indicativeNote: INDICATIVE_NOTE,
 };
 
-function buildEvidenceContext(evidence: Array<EvidenceExtract | Transcript>): string {
-  return (
-    "\n\nEVIDENCE SUBMITTED BY THE LITIGANT:\n" +
-    evidence
-      .map((e, i) => {
-        const base =
-          `[Evidence ${i + 1} — ${e.kind === "image" ? "Document/Image" : "Audio"}: ${e.sourceFile}]\n` +
-          `Summary: ${e.summary}\n` +
-          `Timeline: ${e.timeline.map((t) => `${t.date}: ${t.description}`).join("; ") || "none"}\n` +
-          `Amounts mentioned: ${e.amounts.join(", ") || "none"}\n` +
-          `Names mentioned: ${e.names.join(", ") || "none"}`;
-        if (e.kind === "image") {
-          return base + `\nExtracted text: ${e.extractedText}`;
-        }
-        return base + `\nTranscript: ${e.transcript}`;
-      })
-      .join("\n\n")
-  );
+function buildEvidencePrompt(evidence: Array<EvidenceExtract | Transcript>): string {
+  return evidence
+    .map((e, i) => {
+      const header =
+        `[Evidence ${i + 1} — ${e.kind === "image" ? "Document/Image" : "Audio"}: ${e.sourceFile}]`;
+      const timeline =
+        e.timeline.length > 0
+          ? `Timeline of events:\n${e.timeline.map((t) => `  - ${t.date}: ${t.description}`).join("\n")}`
+          : "Timeline: none identified";
+      const base =
+        `${header}\n` +
+        `Summary: ${e.summary}\n` +
+        `${timeline}\n` +
+        `Amounts: ${e.amounts.join(", ") || "none"}\n` +
+        `Names: ${e.names.join(", ") || "none"}`;
+
+      if (e.kind === "image") return base + `\nExtracted text: ${e.extractedText}`;
+      return base + `\nTranscript: ${e.transcript}`;
+    })
+    .join("\n\n");
 }
 
 export async function POST(req: Request) {
@@ -74,34 +71,38 @@ export async function POST(req: Request) {
     return NextResponse.json(MOCK_HEARING_SCRIPT);
   }
 
-  const body = (await req.json()) as RequestBody;
-  const { statement, evidence } = body;
+  const body = (await req.json()) as HearingScriptFromEvidenceRequest;
+  const { evidence, statement } = body;
 
-  if (!statement?.trim()) {
+  if (!evidence || evidence.length === 0) {
     return NextResponse.json(
-      { error: "statement is required" },
+      { error: "evidence is required — pass the output from /api/evidence and/or /api/transcribe" },
       { status: 400 },
     );
   }
 
-  const evidenceContext =
-    evidence && evidence.length > 0 ? buildEvidenceContext(evidence) : "";
+  const evidenceContext = buildEvidencePrompt(evidence);
+  const statementContext = statement?.trim()
+    ? `\n\nADDITIONAL STATEMENT FROM LITIGANT:\n${statement}`
+    : "";
 
   const result = await chatJson<HearingScript>({
     system: [
       rulesetToPrompt(),
       "You are helping a self-represented litigant at Singapore's Small Claims Tribunal " +
-        "structure their witness statement and uploaded evidence into a court-ready hearing script.",
-      "Use ONLY the facts present in the statement and evidence provided. Do NOT invent facts, names, dates, or amounts.",
+        "prepare a court-ready hearing script from their uploaded evidence.",
+      "The evidence below was processed by an AI evidence organiser — use the timelines, " +
+        "summaries, amounts, and names extracted from it as the SOLE source of facts.",
+      "Do NOT invent facts, names, dates, or amounts that are not present in the evidence.",
       "Return valid JSON matching this exact shape:",
       "{ opening: string, chronology: [{ heading: string, content: string, evidenceRefs?: string[] }], reliefSought: string, indicativeNote: string }",
-      "Rules for each field:",
-      "- opening: A short plain-language introduction (2–3 sentences) — who the litigant is, what happened, and what they are claiming.",
-      "- chronology: Events in strict date order. Each entry must be tied to at least one piece of evidence where available. evidenceRefs must list the exact sourceFile names from the evidence provided.",
-      "- reliefSought: The exact remedy requested (e.g. 'Refund of $X for Y'). Derive from amounts in the statement/evidence only.",
+      "Rules:",
+      "- opening: 2–3 sentences — who the litigant is, what happened, what they are claiming.",
+      "- chronology: Events in strict date order from the timelines. Each entry must reference the sourceFile it came from in evidenceRefs.",
+      "- reliefSought: The exact remedy (e.g. 'Refund of $X for Y'). Derive only from amounts found in the evidence.",
       "- indicativeNote: Copy exactly: " + JSON.stringify(INDICATIVE_NOTE),
     ].join("\n"),
-    user: `WITNESS STATEMENT:\n${statement}${evidenceContext}`,
+    user: `EVIDENCE FROM TRACK A:\n\n${evidenceContext}${statementContext}`,
   });
 
   return NextResponse.json({ ...result, indicativeNote: INDICATIVE_NOTE });
