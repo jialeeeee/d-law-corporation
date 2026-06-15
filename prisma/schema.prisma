@@ -14,6 +14,21 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// App-level user profile, one row per Supabase Auth user. The row is created
+// automatically by the `on_auth_user_created` trigger on signup (see
+// supabase/migrations/0001_profiles_and_auth.sql), which also adds the
+// id -> auth.users(id) foreign key that Prisma can't express across schemas.
+// `id` here equals the Supabase auth uid (= Case.userId).
+model Profile {
+  id        String   @id @db.Uuid
+  email     String?
+  fullName  String?  @map("full_name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}
+
 model Case {
   id        String   @id @default(cuid())
   // Owner = Supabase Auth user id (uuid). Nullable for now so in-progress F2/F6

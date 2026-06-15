@@ -1,22 +1,7 @@
 import Link from "next/link";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { INDICATIVE_NOTE } from "@/lib/sct/ruleset";
-import {
-  getCurrentUser,
-  createClient,
-  isSupabaseConfigured,
-} from "@/lib/supabase/server";
-
-async function signOut() {
-  "use server";
-  if (isSupabaseConfigured) {
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-  }
-  revalidatePath("/", "layout");
-  redirect("/login");
-}
+import { getCurrentUser } from "@/lib/supabase/server";
+import { signOut } from "./(auth)/actions";
 
 export default async function Home() {
   const user = await getCurrentUser();

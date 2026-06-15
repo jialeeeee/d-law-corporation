@@ -107,8 +107,11 @@ lib/agnes/parseJson.ts ...... defensive JSON parse (Lead owns)
 lib/sct/ruleset.ts .......... SCT grounding (Lead owns)
 lib/db.ts ................... Prisma client singleton (Lead owns)
 lib/supabase/*.ts .......... auth clients (browser/server) + session helpers (Lead owns)
+lib/auth.ts ................. requireUser() + safe-redirect helpers (Lead owns)
 middleware.ts .............. session refresh + route protection (Lead owns)
-prisma/schema.prisma ........ data model (Lead owns)
+prisma/schema.prisma ........ data model incl. Profile (Lead owns)
+supabase/migrations/*.sql ... profiles trigger + RLS (run after db:push — see supabase/SETUP.md)
+app/auth/confirm ........... email-confirmation callback (Lead owns)
 app/api/evidence ........... F2 (vision) — ACTIVE
 app/api/transcribe ......... F2 (audio) — ACTIVE
 app/api/hearing-script ..... F6 — ACTIVE
@@ -154,14 +157,20 @@ env, deploy, **merge coordination.** The Agnes client (incl. a swappable `transc
 types, the ruleset and the schema are pushed to `main`. This unblocks everyone.
 
 ### Auth — Lead (`feat/auth`)
-**Owns:** `lib/supabase/*`, `middleware.ts`, `app/(auth)/*`, the `Case.userId` schema field.
-Supabase Auth (email/password) via `@supabase/ssr`. `/login` + `/register` use server actions;
-`middleware.ts` refreshes the session and redirects signed-out users away from `/wizard`.
-**Donna** restyles the `(auth)` forms (they're intentionally minimal). Degrades gracefully when
-`NEXT_PUBLIC_SUPABASE_*` aren't set yet, so other tracks aren't blocked.
+**Owns:** `lib/supabase/*`, `lib/auth.ts`, `middleware.ts`, `app/(auth)/*`, `app/auth/confirm/*`,
+the `Profile` model + `Case.userId` schema field, `supabase/migrations/*`.
+Supabase Auth (email/password) via `@supabase/ssr`. `/login` + `/register` are server actions
+(`app/(auth)/actions.ts`) with server-side validation and a safe `?next=` redirect;
+`signOut()` lives there too. `middleware.ts` refreshes the session and redirects signed-out users
+away from `/wizard` (with `?next=`). `app/auth/confirm/route.ts` handles the email-confirmation
+link (`verifyOtp`). On signup a DB trigger creates a `profiles` row (see §5a / `supabase/SETUP.md`).
+**Donna** restyles the `(auth)` forms (intentionally minimal) — keep the field `name`s
+(`email`, `password`, `fullName`, hidden `next`). Degrades gracefully when
+`NEXT_PUBLIC_SUPABASE_*` aren't set, so other tracks aren't blocked.
 **Data isolation:** Prisma bypasses Supabase RLS, so EVERY feature must filter `Case`/`Evidence`
-by the signed-in `userId` (see §5). Get the current user server-side via
-`getCurrentUser()` from `lib/supabase/server.ts`.
+by the signed-in `userId` (see §5a). Resolve + guard in one call with
+`requireUser()` from `lib/auth.ts` (redirects to `/login` if signed out; returns the user whose
+`.id` you filter by), or `getCurrentUser()` (`lib/supabase/server.ts`) when you want `null` instead.
 
 ### TRACK A — Feature 2 (Evidence organiser + audio transcription)
 **Branch:** `feat/evidence-audio` · **Owns:** `app/api/evidence/*`, `app/api/transcribe/*`, uploads, fact↔evidence linking.
@@ -281,17 +290,23 @@ If revived, the Lead re-adds the matching types to `lib/types.ts` and the JSON f
 
 ## 5. Data model (Lead, via PR)
 
-`Case` holds `statement String?` and `hearingScript Json?` (F6). `Evidence` has a
+`Profile` (1:1 with the Supabase Auth user; `id` = auth uid) holds `email` / `full_name`, created
+automatically by the `on_auth_user_created` trigger on signup. `Case` holds `statement String?`
+and `hearingScript Json?` (F6) plus `userId` (= auth uid). `Evidence` has a
 `kind: "image" | "audio"` discriminator and the structured extract in `extract Json` (F2).
-`MaterialFact` links to `Evidence`. See `prisma/schema.prisma`. Minimise stored data (PDPA).
+`MaterialFact` links to `Evidence`. See `prisma/schema.prisma`. Tables are created with
+`npm run db:push` + the two `supabase/migrations/*.sql` files (`supabase/SETUP.md`).
+Minimise stored data (PDPA).
 
 ### 5a. Ownership / data isolation (auth)
 
 `Case.userId` (nullable for now) holds the Supabase Auth user id. Because the app reads data via
 Prisma — which connects with full DB privileges and **bypasses Supabase Row-Level Security** —
 ownership is enforced in application code: **every read/write of a `Case` (and its `Evidence` /
-`MaterialFact`) must filter by the authenticated `userId`.** Resolve the user server-side with
-`getCurrentUser()` (`lib/supabase/server.ts`). Don't rely on RLS for the Prisma path.
+`MaterialFact`) must filter by the authenticated `userId`.** Resolve + guard with
+`requireUser()` (`lib/auth.ts`) and filter by the returned `user.id`. RLS is still *enabled* on
+every `public` table (`supabase/migrations/0002_enable_rls.sql`) to block the public anon REST
+API — that's defense in depth, not the primary control. Don't rely on RLS for the Prisma path.
 
 ---
 
