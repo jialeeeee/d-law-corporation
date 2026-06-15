@@ -24,12 +24,17 @@ From the repo root, with `.env.local` in place:
 npm run db:push                 # creates profiles, Case, Evidence, MaterialFact
 ```
 
-Then run the two SQL files (auth glue + RLS) — either paste them into the
-Supabase **SQL Editor**, or run from the CLI:
+Then run the two SQL files (auth glue + RLS). **Easiest: paste each file into the
+Supabase → SQL Editor and Run.** They're idempotent, so order/re-runs are safe.
+
+CLI alternative (Git Bash) — note it must use the **session pooler** URL
+(`DIRECT_URL`); the `:6543` pooler hangs `prisma db execute`, and the Prisma CLI
+doesn't read `.env.local` on its own:
 
 ```bash
-npx prisma db execute --schema prisma/schema.prisma --file supabase/migrations/0001_profiles_and_auth.sql
-npx prisma db execute --schema prisma/schema.prisma --file supabase/migrations/0002_enable_rls.sql
+DIR=$(grep '^DIRECT_URL=' .env.local | cut -d= -f2- | tr -d '"')
+npx prisma db execute --url "$DIR" --file supabase/migrations/0001_profiles_and_auth.sql
+npx prisma db execute --url "$DIR" --file supabase/migrations/0002_enable_rls.sql
 ```
 
 What they do:
