@@ -35,7 +35,7 @@ The team narrowed scope. **Only two features are active.** Do NOT build the defe
 | --- | --- | --- |
 | **F2 — Evidence organiser (docs + images)** | ✅ **ACTIVE** (docs shipped v0.2.0) | `feat/evidence-docs` |
 | **F2 — Audio transcription** | ✅ **ACTIVE** | `feat/evidence-audio` |
-| **F6 — Hearing script + mock Q&A** | ✅ **ACTIVE** | `feat/court-appearance` |
+| **F6 — Hearing script + mock Q&A** | ✅ **DONE** | `feat/court-appearance` |
 | F1 — Eligibility checker | ⛔ deferred | — |
 | F3 — Claim amount calculator | ⛔ deferred | — |
 | F4 — e-Negotiation coach | ⛔ deferred | — |
@@ -86,7 +86,8 @@ scope for now.
 - **Agnes (OpenAI-compatible):** base URL `https://apihub.agnes-ai.com/v1`
   - text/vision: `agnes-2.0-flash` · image: `agnes-image-2.1-flash` / `agnes-image-2.0-flash` · video: `agnes-video-v2.0`
   - audio transcription: **unconfirmed** — see Track A (F2).
-- **Commands:** `npm run dev` · `npm run build` · `npm run db:push`
+- **Commands:** `npm run dev` · `npm run build` · `npm run db:push` (the db scripts are wrapped with `dotenv-cli` so they read `.env.local`, which Prisma's CLI otherwise ignores).
+- **Env:** put secrets in `.env.local` (git-ignored; copy from `.env.example`). Needed to run against the real DB/Agnes — ask the Lead for the values.
 - **Path alias:** `@/*` → repo root (already set in `tsconfig.json`).
 
 ---
@@ -104,8 +105,8 @@ model directly.
 | **F2** `POST /api/evidence` (image) | `visionJson()` | `agnes-2.0-flash` (vision) | Reads the uploaded image and returns the transcript (`extractedText`), summary, timeline of dated events, dates/amounts/names, and a `quality` flag. |
 | **F2** `POST /api/evidence` (doc) | text-extract → `chatJson()` | `agnes-2.0-flash` | PDF/DOCX/text extracted by `lib/evidence/extractText.ts`, then Agnes structures it into the same `EvidenceExtract`. Scanned/empty docs are flagged via `quality.sufficient=false`. |
 | **F2** `POST /api/transcribe` | `transcribe()` → then `chatJson()` | Agnes `audio/transcriptions` (unconfirmed; swappable) → `agnes-2.0-flash` | Transcribes the audio, then structures it into `Transcript` (transcript, summary, timeline, language, needsTranslation, …). |
-| **F6** `POST /api/hearing-script` | `chatJson()` | `agnes-2.0-flash` | Turns the witness statement into a `HearingScript` (opening, chronology tied to evidence, relief sought). |
-| **F6** `POST /api/mock-qa` | `chatJson()` | `agnes-2.0-flash` | Simulates the Tribunal Magistrate's probing questions and gives feedback (`MockQATurn`). |
+| **F6** `POST /api/hearing-script` | `chatJson()` | `agnes-2.0-flash` | Accepts witness statement + optional evidence extracts from Track A. Returns `HearingScript` (opening, chronology tied to source evidence files, relief sought). |
+| **F6** `POST /api/mock-qa` | `chatJson()` | `agnes-2.0-flash` | Alternates between Tribunal Magistrate (even turns) and opposing party (odd turns). Returns `MockQATurnExtended`: question, questionFrom, feedbackOnLastAnswer, recommendedAnswer, tips[], done, indicativeNote. |
 
 Notes for the demo / write-up:
 - The Agnes model ids are centralised in `AGNES_MODELS` (`lib/agnes/client.ts`).
@@ -127,9 +128,12 @@ lib/sct/ruleset.ts .......... SCT grounding (Lead owns)
 lib/db.ts ................... Prisma client singleton (Lead owns)
 lib/evidence/extractText.ts . F2 doc text extraction (pdf/docx/text) — Track A
 lib/supabase/*.ts .......... auth clients (browser/server) + session helpers (Lead owns)
+lib/auth.ts ................. requireUser() + safe-redirect helpers (Lead owns)
 middleware.ts .............. session refresh + route protection (Lead owns)
-prisma/schema.prisma ........ data model (Lead owns)
-app/api/evidence ........... F2 (image + document) — ACTIVE (v0.2.0)
+prisma/schema.prisma ........ data model incl. Profile (Lead owns)
+supabase/migrations/*.sql ... profiles trigger + RLS (run after db:push — see supabase/SETUP.md)
+app/auth/confirm ........... email-confirmation callback (Lead owns)
+app/api/evidence ........... F2 (image + document) — ACTIVE
 app/api/transcribe ......... F2 (audio) — ACTIVE
 app/api/hearing-script ..... F6 — ACTIVE
 app/api/mock-qa ............ F6 — ACTIVE
@@ -159,7 +163,7 @@ there via a tiny PR**, then you import it. Active types:
 | Track | Branch | Folder you own | Owner |
 | --- | --- | --- | --- |
 | A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | **Jing Yuan** → `/api/evidence` · **Damien** → `/api/transcribe` |
-| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | **Jia Le** |
+| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | **Jia Le** ✅ DONE |
 | P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | **Donna** |
 | Auth (login/register) | `feat/auth` | `lib/supabase/*`, `middleware.ts`, `app/(auth)/*` | **Jun Sheng** (Donna styles forms) |
 | Foundation + merges | `main` | `lib/*`, `prisma/*` | **Jun Sheng** (Lead) |
@@ -173,15 +177,25 @@ or `prisma/schema.prisma`? Ping Jun Sheng for a quick PR.
 env, deploy, **merge coordination.** The Agnes client (incl. a swappable `transcribe()`), the locked
 types, the ruleset and the schema are pushed to `main`. This unblocks everyone.
 
-### Auth — Lead (`feat/auth`)
-**Owns:** `lib/supabase/*`, `middleware.ts`, `app/(auth)/*`, the `Case.userId` schema field.
-Supabase Auth (email/password) via `@supabase/ssr`. `/login` + `/register` use server actions;
-`middleware.ts` refreshes the session and redirects signed-out users away from `/wizard`.
-**Donna** restyles the `(auth)` forms (they're intentionally minimal). Degrades gracefully when
-`NEXT_PUBLIC_SUPABASE_*` aren't set yet, so other tracks aren't blocked.
+### Auth — Lead (`feat/auth`) — ✅ backend verified working
+**Status:** the Supabase project is provisioned and the auth **backend is verified end-to-end**
+(register → auto-profile trigger → login, plus wrong-password / non-existent / duplicate rejection,
+all green). "Confirm email" is OFF in Supabase, so signup returns a session and routes to `/wizard`.
+What's left is the **UI** (Donna) and wiring case creation to `userId`.
+**Owns:** `lib/supabase/*`, `lib/auth.ts`, `middleware.ts`, `app/(auth)/*`, `app/auth/confirm/*`,
+the `Profile` model + `Case.userId` schema field, `supabase/migrations/*`.
+Supabase Auth (email/password) via `@supabase/ssr`. `/login` + `/register` are server actions
+(`app/(auth)/actions.ts`) with server-side validation and a safe `?next=` redirect;
+`signOut()` lives there too. `middleware.ts` refreshes the session and redirects signed-out users
+away from `/wizard` (with `?next=`). `app/auth/confirm/route.ts` handles the email-confirmation
+link (`verifyOtp`). On signup a DB trigger creates a `profiles` row (see §5a / `supabase/SETUP.md`).
+**Donna** restyles the `(auth)` forms (intentionally minimal) — keep the field `name`s
+(`email`, `password`, `fullName`, hidden `next`). Degrades gracefully when
+`NEXT_PUBLIC_SUPABASE_*` aren't set, so other tracks aren't blocked.
 **Data isolation:** Prisma bypasses Supabase RLS, so EVERY feature must filter `Case`/`Evidence`
-by the signed-in `userId` (see §5). Get the current user server-side via
-`getCurrentUser()` from `lib/supabase/server.ts`.
+by the signed-in `userId` (see §5a). Resolve + guard in one call with
+`requireUser()` from `lib/auth.ts` (redirects to `/login` if signed out; returns the user whose
+`.id` you filter by), or `getCurrentUser()` (`lib/supabase/server.ts`) when you want `null` instead.
 
 ### TRACK A — Feature 2 (Evidence organiser + audio transcription)
 **Branch:** `feat/evidence-audio` · **Owns:** `app/api/evidence/*`, `app/api/transcribe/*`, uploads, fact↔evidence linking.
@@ -202,16 +216,23 @@ call `setTranscribeProvider()` (Whisper / AssemblyAI / local) so the feature shi
   audio/video evidence to be submitted with a transcript. (Doc/image transcript download shipped in the wizard UI.)
 **Done when:** image/doc/audio → structured extract incl. transcript, summary, timeline; non-English flagged; poor uploads flagged; transcript exportable; audio provider swappable.
 
-### TRACK B — Feature 6 (Court appearance: hearing script + mock Q&A)
-**Branch:** `feat/court-appearance` · **Owns:** `app/api/hearing-script/*`, `app/api/mock-qa/*` + their UI.
-**Spec:**
-- `POST /api/hearing-script { statement } -> HearingScript` — plain-language opening, chronology
-  walkthrough, each material fact tied to its evidence, relief sought. Derived ONLY from the user's
-  witness statement; stress explaining every component (each invoice/defect).
-- `POST /api/mock-qa { statement, history[] } -> MockQATurn` — simulate the Tribunal Magistrate's
-  likely probing ("how do you know X?", "where's your proof of Y?", "explain this invoice"), and give
-  feedback on the user's last answer. Iterative loop.
-**Done when:** script derived only from the statement; mock Q&A loops with constructive feedback; all carry the not-advice note.
+### TRACK B — Feature 6 (Court appearance: hearing script + mock Q&A) ✅ DONE
+**Branch:** `feat/court-appearance` · **Owner:** Jia Le · **Owns:** `app/api/hearing-script/*`, `app/api/mock-qa/*`.
+
+- `POST /api/hearing-script { statement, evidence? } -> HearingScript` — accepts the witness
+  statement plus optional `EvidenceExtract[]|Transcript[]` from Track A. Returns a plain-language
+  opening, chronology with each event tied to its source evidence file (`evidenceRefs`), and exact
+  relief sought. Derived only from provided data — nothing invented.
+- `POST /api/mock-qa { statement, history[] } -> MockQATurnExtended` — alternates questioner:
+  even turns = Tribunal Magistrate, odd turns = opposing party. Each turn returns:
+  `question`, `questionFrom ("magistrate"|"opponent")`, `feedbackOnLastAnswer` (on prior answer),
+  `recommendedAnswer` (suggested model answer for litigant), `tips[]`, `done` (true after ≥6
+  exchanges), `indicativeNote`. `MockQATurnExtended` is a superset of `MockQATurn` — additive,
+  non-breaking. Exported from `app/api/mock-qa/route.ts` for use by the UI.
+
+Both endpoints: grounded with `rulesetToPrompt()`, call `chatJson()` on `agnes-2.0-flash`,
+parse defensively, always force-attach `INDICATIVE_NOTE`. Support `USE_MOCK=1` fixture shortcut.
+**Build:** ✅ `npm run build` passes with zero type errors.
 
 ### P5 — Wizard UI
 **Owns:** `app/(web)/*`. Surface the two active features as steps/tabs; call the routes above.
@@ -304,17 +325,23 @@ If revived, the Lead re-adds the matching types to `lib/types.ts` and the JSON f
 
 ## 5. Data model (Lead, via PR)
 
-`Case` holds `statement String?` and `hearingScript Json?` (F6). `Evidence` has a
+`Profile` (1:1 with the Supabase Auth user; `id` = auth uid) holds `email` / `full_name`, created
+automatically by the `on_auth_user_created` trigger on signup. `Case` holds `statement String?`
+and `hearingScript Json?` (F6) plus `userId` (= auth uid). `Evidence` has a
 `kind: "image" | "audio"` discriminator and the structured extract in `extract Json` (F2).
-`MaterialFact` links to `Evidence`. See `prisma/schema.prisma`. Minimise stored data (PDPA).
+`MaterialFact` links to `Evidence`. See `prisma/schema.prisma`. Tables are created with
+`npm run db:push` + the two `supabase/migrations/*.sql` files (`supabase/SETUP.md`).
+Minimise stored data (PDPA).
 
 ### 5a. Ownership / data isolation (auth)
 
 `Case.userId` (nullable for now) holds the Supabase Auth user id. Because the app reads data via
 Prisma — which connects with full DB privileges and **bypasses Supabase Row-Level Security** —
 ownership is enforced in application code: **every read/write of a `Case` (and its `Evidence` /
-`MaterialFact`) must filter by the authenticated `userId`.** Resolve the user server-side with
-`getCurrentUser()` (`lib/supabase/server.ts`). Don't rely on RLS for the Prisma path.
+`MaterialFact`) must filter by the authenticated `userId`.** Resolve + guard with
+`requireUser()` (`lib/auth.ts`) and filter by the returned `user.id`. RLS is still *enabled* on
+every `public` table (`supabase/migrations/0002_enable_rls.sql`) to block the public anon REST
+API — that's defense in depth, not the primary control. Don't rely on RLS for the Prisma path.
 
 ---
 
@@ -356,7 +383,8 @@ git checkout feat/<yours> && git merge main
 ## 8. Build order
 
 1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema, and
-   Supabase Auth (login/registration) with `Case.userId`.
+   Supabase Auth (login/registration) with `Case.userId`. The Supabase DB is provisioned and the
+   auth backend is verified working (tables/trigger/RLS live); the db scripts read `.env.local`.
 2. Track A (`feat/evidence-audio`) and Track B (`feat/court-appearance`) build in parallel against
    the locked contracts (frontend can use mocks immediately), scoping data by the signed-in `userId`.
 3. P5 surfaces both features in `app/(web)`, behind login.

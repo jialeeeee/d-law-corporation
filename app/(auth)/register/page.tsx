@@ -16,6 +16,11 @@ export default async function RegisterPage({
       {error ? <p className="notice auth-error">{error}</p> : null}
 
       <form action={register} className="auth-form">
+        {/* Optional — stored as user metadata → profiles.full_name. */}
+        <label>
+          Name
+          <input name="fullName" type="text" autoComplete="name" />
+        </label>
         <label>
           Email
           <input name="email" type="email" autoComplete="email" required />
@@ -26,7 +31,7 @@ export default async function RegisterPage({
             name="password"
             type="password"
             autoComplete="new-password"
-            minLength={6}
+            minLength={8}
             required
           />
         </label>
