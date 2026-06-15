@@ -569,3 +569,84 @@ pre.transcript {
   background: #fdecea;
   color: #b71c1c;
 }
+
+/* ── Site header (top nav with auth state) ───────────────────────────────── */
+.site-header {
+  border-bottom: 1px solid var(--border);
+  background: #ffffff;
+}
+.site-header__inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0.85rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #000000;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.site-brand:hover {
+  text-decoration: none;
+}
+.site-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.site-user {
+  font-size: 0.9rem;
+  color: var(--muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.site-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+}
+.site-link:hover {
+  text-decoration: none;
+  background: #f0f7ff;
+}
+.btn-cta {
+  background: var(--accent);
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+.btn-cta:hover {
+  background: #0052a3;
+  text-decoration: none;
+}
+.btn-signout {
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.btn-signout:hover {
+  border-color: var(--accent);
+  background: #f8f9fa;
+}
