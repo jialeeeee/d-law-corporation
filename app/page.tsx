@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { signOut } from "@/app/(auth)/actions";
 
 // Public landing page. Premium D'Law aesthetic (teal/navy, Spectral serif),
 // auth-aware CTAs. The real app lives at /workspace (gated by middleware).
@@ -100,9 +101,16 @@ export default async function Home() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {loggedIn ? (
-                <Link href="/workspace" style={btnTeal}>
-                  Open workspace
-                </Link>
+                <>
+                  <Link href="/workspace" style={btnTeal}>
+                    Open workspace
+                  </Link>
+                  <form action={signOut}>
+                    <button type="submit" style={btnGhost}>
+                      Sign out
+                    </button>
+                  </form>
+                </>
               ) : (
                 <>
                   <Link href="/login" style={btnGhost}>

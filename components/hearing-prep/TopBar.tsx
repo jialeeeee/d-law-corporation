@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useWorkspace } from "@/lib/store/WorkspaceProvider";
 import { readiness } from "@/lib/store/store";
+import { signOut } from "@/app/(auth)/actions";
 import { Icon, useUI } from "./ui";
 
 export interface AppUser {
@@ -379,6 +380,17 @@ export function TopBar({
             </div>
           </div>
         </div>
+
+        <form action={signOut} style={{ display: "flex" }}>
+          <button
+            type="submit"
+            className="dl-icon-btn"
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <Icon name="logout" />
+          </button>
+        </form>
       </div>
     </header>
   );
