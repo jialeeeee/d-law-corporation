@@ -40,7 +40,62 @@ export default function Home() {
   }, []);
 
   return (
-    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "3rem 1.5rem" }}>
+    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "1.5rem 1.5rem 3rem" }}>
+      {/* Top navigation — brand + auth entry points */}
+      <nav
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "2.5rem",
+        }}
+      >
+        <Link
+          href="/"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            textDecoration: "none",
+            color: "#000000",
+            fontWeight: 700,
+            fontSize: "1.15rem",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          <span aria-hidden>⚖️</span> Dlaw
+        </Link>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <Link
+            href="/login"
+            style={{
+              color: "#0066cc",
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              padding: "0.5rem 0.85rem",
+              borderRadius: "6px",
+            }}
+          >
+            Log in
+          </Link>
+          <Link
+            href="/register"
+            style={{
+              backgroundColor: "#0066cc",
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "6px",
+            }}
+          >
+            Sign up
+          </Link>
+        </div>
+      </nav>
+
       {/* Hero Section */}
       <div style={{ textAlign: "center", marginBottom: "3rem" }}>
         <h1 style={{
