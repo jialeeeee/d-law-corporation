@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+<<<<<<< Updated upstream
+=======
+import { prisma } from "@/lib/db";
+>>>>>>> Stashed changes
 
 /**
  * GET /api/cases - List all cases
@@ -6,6 +10,7 @@ import { NextResponse } from "next/server";
  */
 
 export async function GET() {
+<<<<<<< Updated upstream
   // Mock data for now - will connect to database later
   const mockCases = [
     {
@@ -27,6 +32,21 @@ export async function GET() {
   ];
 
   return NextResponse.json({ cases: mockCases });
+=======
+  try {
+    const cases = await prisma.case.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    return NextResponse.json({ cases });
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to fetch cases" },
+      { status: 500 },
+    );
+  }
+>>>>>>> Stashed changes
 }
 
 export async function POST(req: Request) {
@@ -40,6 +60,7 @@ export async function POST(req: Request) {
       );
     }
 
+<<<<<<< Updated upstream
     // Generate a mock ID for the new case
     const newCase = {
       id: `clrd${Date.now()}`,
@@ -51,6 +72,16 @@ export async function POST(req: Request) {
     };
 
     return NextResponse.json({ case: newCase }, { status: 201 });
+=======
+    const caseData = await prisma.case.create({
+      data: {
+        title,
+        status: "draft",
+      },
+    });
+
+    return NextResponse.json({ case: caseData }, { status: 201 });
+>>>>>>> Stashed changes
   } catch {
     return NextResponse.json(
       { error: "Failed to create case" },

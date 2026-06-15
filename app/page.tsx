@@ -15,6 +15,7 @@ interface CaseItem {
 export default function Home() {
   const [cases, setCases] = useState<CaseItem[]>([]);
   const [loading, setLoading] = useState(true);
+<<<<<<< Updated upstream
 
   useEffect(() => {
     const mockCases: CaseItem[] = [
@@ -308,6 +309,156 @@ export default function Home() {
         This output is generated to help you organise your own case for the Small Claims Tribunal.
         It is information, not legal advice, and does not predict any outcome. The official CJTS pre-filing
         assessment and the Tribunal are the authority.
+=======
+
+  useEffect(() => {
+    // For now, use mock data since the API is not implemented yet
+    // In production, this would fetch from /api/cases
+    const mockCases: CaseItem[] = [
+      {
+        id: "clrd001",
+        title: "ABC Pte Ltd - Failed Repairs",
+        status: "draft",
+        claimAmount: 2000,
+        claimType: "Service dispute",
+        createdAt: "2026-01-03T00:00:00Z",
+      },
+      {
+        id: "clrd002",
+        title: "XYZ Electronics - Defective Goods",
+        status: "draft",
+        claimAmount: 850,
+        claimType: "Goods dispute",
+        createdAt: "2025-12-15T00:00:00Z",
+      },
+    ];
+    setCases(mockCases);
+    setLoading(false);
+  }, []);
+
+  return (
+    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+        <h1>Making Claims Easier</h1>
+        <Link
+          href="/case-new"
+          style={{
+            padding: "0.75rem 1.5rem",
+            backgroundColor: "#0070f3",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "1rem",
+            cursor: "pointer",
+            textDecoration: "none",
+          }}
+        >
+          + Add New Case
+        </Link>
+      </div>
+
+      <p style={{ color: "#666", marginBottom: "2rem" }}>
+        Turn your own account into a clear, court-ready case for Singapore's
+        Small Claims Tribunal.
+      </p>
+
+      {/* Previous Cases Section */}
+      <h2 style={{ marginBottom: "1rem" }}>Previous Cases</h2>
+
+      {loading ? (
+        <p>Loading cases...</p>
+      ) : cases.length === 0 ? (
+        <div style={{
+          padding: "2rem",
+          backgroundColor: "#f5f5f5",
+          borderRadius: "8px",
+          textAlign: "center",
+        }}>
+          <p style={{ color: "#666" }}>No cases yet. Create your first case to get started.</p>
+          <Link
+            href="/case-new"
+            style={{
+              display: "inline-block",
+              marginTop: "1rem",
+              padding: "0.75rem 1.5rem",
+              backgroundColor: "#0070f3",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "1rem",
+              cursor: "pointer",
+              textDecoration: "none",
+            }}
+          >
+            Create Case
+          </Link>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {cases.map((caseItem) => (
+            <Link
+              key={caseItem.id}
+              href={`/case/${caseItem.id}`}
+              style={{
+                display: "block",
+                padding: "1.5rem",
+                backgroundColor: "#fff",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+                textDecoration: "none",
+                color: "inherit",
+                transition: "box-shadow 0.2s",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"}
+              onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h3 style={{ margin: "0 0 0.5rem 0" }}>{caseItem.title}</h3>
+                  <p style={{ margin: "0.25rem 0", color: "#666", fontSize: "0.9rem" }}>
+                    {caseItem.claimType} · SGD {caseItem.claimAmount?.toLocaleString()}
+                  </p>
+                  <p style={{ margin: "0.25rem 0", color: "#999", fontSize: "0.85rem" }}>
+                    Created: {new Date(caseItem.createdAt).toLocaleDateString("en-SG")}
+                  </p>
+                </div>
+                <span style={{
+                  padding: "0.25rem 0.75rem",
+                  backgroundColor: caseItem.status === "draft" ? "#fff3e0" : "#e8f5e9",
+                  color: caseItem.status === "draft" ? "#e65100" : "#2e7d32",
+                  borderRadius: "4px",
+                  fontSize: "0.85rem",
+                  textTransform: "capitalize",
+                }}>
+                  {caseItem.status}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Active Features Info */}
+      <div style={{ marginTop: "3rem", padding: "1.5rem", backgroundColor: "#e3f2fd", borderRadius: "8px" }}>
+        <h2>Active Features</h2>
+        <ul style={{ lineHeight: "1.8" }}>
+          <li>
+            <strong>Evidence organiser + audio transcription</strong> — extract
+            structured facts from images and audio, flag non-English material.
+          </li>
+          <li>
+            <strong>Hearing prep</strong> — turn your witness statement into a
+            hearing script and rehearse with a mock Q&A.
+          </li>
+        </ul>
+      </div>
+
+      <p style={{ marginTop: "2rem", fontSize: "0.85rem", color: "#666" }}>
+        This output is generated to help you organise your own case for the Small
+        Claims Tribunal. It is information, not legal advice, and does not predict
+        any outcome. The official CJTS pre-filing assessment and the Tribunal are the
+        authority.
+>>>>>>> Stashed changes
       </p>
     </main>
   );
