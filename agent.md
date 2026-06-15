@@ -41,9 +41,15 @@ The team narrowed scope. **Only two features are active.** Do NOT build the defe
 text in the image), a **timeline** of dated events, and a **summary** — see `EvidenceExtract`
 in `lib/types.ts`.
 
-The foundation (Next.js scaffold, Agnes client, ruleset, Prisma schema, shared types) is already
-on `main`. The §0 non-negotiables below still apply in full. Deferred features keep their original
-spec in Section 4 for if/when they return, but are out of scope for now.
+The foundation (Next.js scaffold, Agnes client, ruleset, Prisma schema, shared types) **and a
+Supabase Auth login/registration system** are on `main`. The §0 non-negotiables below still apply in
+full. Deferred features keep their original spec in Section 4 for if/when they return, but are out of
+scope for now.
+
+> **Auth (added 2026-06-15):** users register / sign in before creating a case and uploading
+> evidence. It's foundational infrastructure (Lead-owned — see §4 Auth track and §5a). Because
+> Prisma bypasses Supabase RLS, **every feature must scope `Case`/`Evidence` queries by the
+> signed-in `userId`.** Resolve it server-side with `getCurrentUser()` (`lib/supabase/server.ts`).
 
 ---
 
@@ -72,9 +78,10 @@ spec in Section 4 for if/when they return, but are out of scope for now.
 ## 1. Stack & key facts
 
 - **Frontend/Backend:** Next.js (App Router) + TypeScript. **DB:** Prisma + Postgres (Supabase). **Deploy:** Vercel.
+- **Auth:** Supabase Auth (email/password) via `@supabase/ssr`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (these two are browser-safe, unlike `AGNES_KEY`/`DATABASE_URL`).
 - **Agnes (OpenAI-compatible):** base URL `https://apihub.agnes-ai.com/v1`
   - text/vision: `agnes-2.0-flash` · image: `agnes-image-2.1-flash` / `agnes-image-2.0-flash` · video: `agnes-video-v2.0`
-  - audio transcription: **unconfirmed** — see Track 3 (F2).
+  - audio transcription: **unconfirmed** — see Track A (F2).
 - **Commands:** `npm run dev` · `npm run build` · `npm run db:push`
 - **Path alias:** `@/*` → repo root (already set in `tsconfig.json`).
 
@@ -115,11 +122,14 @@ lib/agnes/parseJson.ts ...... defensive JSON parse (Lead owns)
 lib/sct/ruleset.ts .......... SCT grounding (Lead owns)
 lib/db.ts ................... Prisma client singleton (Lead owns)
 lib/evidence/extractText.ts . F2 doc text extraction (pdf/docx/text) — Track A
+lib/supabase/*.ts .......... auth clients (browser/server) + session helpers (Lead owns)
+middleware.ts .............. session refresh + route protection (Lead owns)
 prisma/schema.prisma ........ data model (Lead owns)
 app/api/evidence ........... F2 (image + document) — ACTIVE (v0.2.0)
 app/api/transcribe ......... F2 (audio) — ACTIVE
 app/api/hearing-script ..... F6 — ACTIVE
 app/api/mock-qa ............ F6 — ACTIVE
+app/(auth) ................. login + register pages (Lead; Donna styles forms)
 app/(web) .................. UI that surfaces the active features (P5 wizard flow)
 ```
 
@@ -147,6 +157,7 @@ there via a tiny PR**, then you import it. Active types:
 | A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | **Jing Yuan** → `/api/evidence` · **Damien** → `/api/transcribe` |
 | B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | **Jia Le** |
 | P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | **Donna** |
+| Auth (login/register) | `feat/auth` | `lib/supabase/*`, `middleware.ts`, `app/(auth)/*` | **Jun Sheng** (Donna styles forms) |
 | Foundation + merges | `main` | `lib/*`, `prisma/*` | **Jun Sheng** (Lead) |
 
 Jing Yuan & Damien share the `feat/evidence-audio` branch, split by endpoint as shown; everyone
@@ -157,6 +168,16 @@ or `prisma/schema.prisma`? Ping Jun Sheng for a quick PR.
 **Owns:** `lib/types.ts`, `lib/agnes/*`, `lib/sct/ruleset.ts`, `lib/db.ts`, `prisma/schema.prisma`,
 env, deploy, **merge coordination.** The Agnes client (incl. a swappable `transcribe()`), the locked
 types, the ruleset and the schema are pushed to `main`. This unblocks everyone.
+
+### Auth — Lead (`feat/auth`)
+**Owns:** `lib/supabase/*`, `middleware.ts`, `app/(auth)/*`, the `Case.userId` schema field.
+Supabase Auth (email/password) via `@supabase/ssr`. `/login` + `/register` use server actions;
+`middleware.ts` refreshes the session and redirects signed-out users away from `/wizard`.
+**Donna** restyles the `(auth)` forms (they're intentionally minimal). Degrades gracefully when
+`NEXT_PUBLIC_SUPABASE_*` aren't set yet, so other tracks aren't blocked.
+**Data isolation:** Prisma bypasses Supabase RLS, so EVERY feature must filter `Case`/`Evidence`
+by the signed-in `userId` (see §5). Get the current user server-side via
+`getCurrentUser()` from `lib/supabase/server.ts`.
 
 ### TRACK A — Feature 2 (Evidence organiser + audio transcription)
 **Branch:** `feat/evidence-audio` · **Owns:** `app/api/evidence/*`, `app/api/transcribe/*`, uploads, fact↔evidence linking.
@@ -283,6 +304,14 @@ If revived, the Lead re-adds the matching types to `lib/types.ts` and the JSON f
 `kind: "image" | "audio"` discriminator and the structured extract in `extract Json` (F2).
 `MaterialFact` links to `Evidence`. See `prisma/schema.prisma`. Minimise stored data (PDPA).
 
+### 5a. Ownership / data isolation (auth)
+
+`Case.userId` (nullable for now) holds the Supabase Auth user id. Because the app reads data via
+Prisma — which connects with full DB privileges and **bypasses Supabase Row-Level Security** —
+ownership is enforced in application code: **every read/write of a `Case` (and its `Evidence` /
+`MaterialFact`) must filter by the authenticated `userId`.** Resolve the user server-side with
+`getCurrentUser()` (`lib/supabase/server.ts`). Don't rely on RLS for the Prisma path.
+
 ---
 
 ## 6. Git workflow
@@ -322,8 +351,11 @@ git checkout feat/<yours> && git merge main
 
 ## 8. Build order
 
-1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema.
+1. **Foundation → `main` (DONE):** types, Agnes client incl. `transcribe()`, ruleset, schema, and
+   Supabase Auth (login/registration) with `Case.userId`.
 2. Track A (`feat/evidence-audio`) and Track B (`feat/court-appearance`) build in parallel against
-   the locked contracts (frontend can use mocks immediately).
-3. P5 surfaces both features in `app/(web)`.
+   the locked contracts (frontend can use mocks immediately), scoping data by the signed-in `userId`.
+3. P5 surfaces both features in `app/(web)`, behind login.
 4. Small PRs into `main` throughout; integrate continuously, not at the end.
+
+> After pulling `main`, run `npm install` — `main` now includes the Supabase deps.
