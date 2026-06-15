@@ -99,9 +99,9 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Audio transcription is currently unavailable. The Agnes speech-to-text " +
-          "endpoint may not be enabled — confirm it in the Agnes dashboard, or " +
-          "configure a transcription provider. (" +
+          "Audio transcription needs a speech-to-text backend. Agnes has no audio " +
+          "model, so set TRANSCRIBE_BASE_URL + TRANSCRIBE_API_KEY (e.g. OpenAI " +
+          "Whisper) in .env.local to enable it. (" +
           (err as Error).message +
           ")",
       },

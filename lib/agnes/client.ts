@@ -100,11 +100,20 @@ export async function visionJson<T = unknown>(
 
 // ──────────────────────────── audio transcription ───────────────────────────
 //
-// Track 3 FIRST TASK (agent.md §4): verify the Agnes dashboard exposes an
-// OpenAI-compatible POST /v1/audio/transcriptions. The default provider below
-// assumes it does. If it does NOT, call setTranscribeProvider() at startup with
-// a swappable provider (Whisper / AssemblyAI / local) so the feature still ships.
-// Keep the rest of the pipeline provider-agnostic.
+// The Agnes speech-to-text endpoint is UNCONFIRMED (agent.md §1) and in testing
+// is unreachable (connection error). So the default provider is ENV-CONFIGURABLE
+// and FAIL-FAST:
+//
+//   • Point it at any OpenAI-compatible Whisper backend without code changes:
+//       TRANSCRIBE_BASE_URL   (default: AGNES_BASE_URL)
+//       TRANSCRIBE_API_KEY    (default: AGNES_KEY)
+//       TRANSCRIBE_MODEL      (default: AGNES_AUDIO_MODEL or "whisper-1")
+//     e.g. to use OpenAI Whisper, set TRANSCRIBE_BASE_URL=https://api.openai.com/v1
+//     and TRANSCRIBE_API_KEY=sk-...  (.ogg/mp3/wav/m4a/webm/flac all supported).
+//   • Fails fast (no retries, short timeout) so an unreachable endpoint returns a
+//     clear error in seconds instead of hanging ~30s (which the browser surfaces
+//     as "Failed to fetch").
+//   • Still fully swappable at runtime via setTranscribeProvider().
 
 export interface TranscribeInput {
   audioUrl?: string;
@@ -140,15 +149,43 @@ async function loadAudio(input: TranscribeInput): Promise<Blob> {
   throw new Error("transcribe: provide audioUrl or audioBase64");
 }
 
-/** Default provider: the (unconfirmed) Agnes OpenAI-compatible audio endpoint. */
-const agnesTranscribe: TranscribeProvider = async (input) => {
+/** How long to wait for a transcription request before failing (ms). */
+const TRANSCRIBE_TIMEOUT_MS = 20_000;
+
+let _transcribeClient: OpenAI | null = null;
+
+/** Lazily build the (possibly separate) client used for audio transcription. */
+function transcribeClient(): OpenAI {
+  if (_transcribeClient) return _transcribeClient;
+  const apiKey = process.env.TRANSCRIBE_API_KEY ?? process.env.AGNES_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "No transcription API key. Set TRANSCRIBE_API_KEY (or AGNES_KEY) in .env.local.",
+    );
+  }
+  _transcribeClient = new OpenAI({
+    apiKey,
+    baseURL: process.env.TRANSCRIBE_BASE_URL ?? AGNES_BASE_URL,
+    // Fail fast: one attempt, short timeout — no long retry hang.
+    maxRetries: 0,
+    timeout: TRANSCRIBE_TIMEOUT_MS,
+  });
+  return _transcribeClient;
+}
+
+/** Default provider: an OpenAI-compatible Whisper endpoint (env-configurable). */
+const defaultTranscribe: TranscribeProvider = async (input) => {
   const blob = await loadAudio(input);
   const file = await OpenAI.toFile(blob, input.sourceFile, {
     type: input.mimeType,
   });
-  const res = await client().audio.transcriptions.create({
+  const res = await transcribeClient().audio.transcriptions.create({
     file,
-    model: input.model ?? process.env.AGNES_AUDIO_MODEL ?? "whisper-1",
+    model:
+      input.model ??
+      process.env.TRANSCRIBE_MODEL ??
+      process.env.AGNES_AUDIO_MODEL ??
+      "whisper-1",
   });
   return {
     text: (res as { text?: string }).text ?? "",
@@ -156,7 +193,7 @@ const agnesTranscribe: TranscribeProvider = async (input) => {
   };
 };
 
-let provider: TranscribeProvider = agnesTranscribe;
+let provider: TranscribeProvider = defaultTranscribe;
 
 /** Swap the transcription backend (Track 3 — see note above). */
 export function setTranscribeProvider(next: TranscribeProvider): void {
