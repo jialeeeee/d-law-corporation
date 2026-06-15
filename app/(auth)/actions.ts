@@ -47,7 +47,7 @@ function back(
   next?: string,
 ): never {
   const params = new URLSearchParams({ error });
-  if (next && next !== "/wizard") params.set("next", next);
+  if (next && next !== "/workspace") params.set("next", next);
   redirect(`${path}?${params.toString()}`);
 }
 

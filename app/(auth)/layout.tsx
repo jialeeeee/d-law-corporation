@@ -8,10 +8,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     <div className="auth-shell">
       <Link href="/" className="auth-brand">
         <span className="logo" aria-hidden>
-          ⚖️
+          D
         </span>
-        <span className="wordmark">Dlaw</span>
-        <span className="tagline">Small Claims Tribunal helper</span>
+        <span className="wordmark">D&rsquo;Law</span>
+        <span className="tagline">Hearing Prep</span>
       </Link>
 
       {children}

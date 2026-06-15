@@ -23,6 +23,9 @@ model Profile {
   id        String   @id @db.Uuid
   email     String?
   fullName  String?  @map("full_name")
+  // App-wide UI preferences (theme, reminders, language). The hearing-prep
+  // workspace persists these here so nothing lives only in the browser.
+  prefs     Json?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -38,9 +41,34 @@ model Case {
   title     String?
   status    String   @default("draft")
 
+  // ── Hearing-prep workspace header (feat/hearing-prep-ui) ──
+  // Display-oriented case metadata shown in the workspace top bar / dashboard.
+  // Nullable so a freshly created blank case carries no fabricated content.
+  caseNo      String?
+  tribunal    String?
+  claimant    String?
+  respondent  String?
+  amountStr   String?
+  hearingISO  String?
+  hearingDate String?
+  hearingTime String?
+  room        String?
+
   // Feature 6 — witness statement input + generated hearing script (HearingScript).
   statement     String?
   hearingScript Json?
+
+  // ── Workspace display state (owned by the client store, persisted as JSON) ──
+  // These mirror the UI's CaseData arrays. They are derived from the user's own
+  // uploads/edits — never seeded with demo content.
+  evidenceItems  Json?
+  timeline       Json?
+  qa             Json?
+  checklist      Json?
+  exportOpts     Json?
+  factGroups     Json?
+  scriptSections Json?
+  scriptReviewed Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

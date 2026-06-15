@@ -12,7 +12,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
  */
 export function safeNext(
   next: string | null | undefined,
-  fallback = "/wizard",
+  fallback = "/workspace",
 ): string {
   if (!next) return fallback;
   const value = next.trim();

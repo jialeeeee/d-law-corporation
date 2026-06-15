@@ -3,7 +3,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Paths that require a signed-in user. Add more as features land.
-const PROTECTED_PREFIXES = ["/wizard"];
+// The Hearing Prep workspace (/workspace) and every case-creation/editing flow
+// are gated — only registered/logged-in users can create or open a case.
+const PROTECTED_PREFIXES = ["/workspace", "/wizard", "/case-new", "/case"];
 
 export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

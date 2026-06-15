@@ -432,8 +432,8 @@ pre.transcript {
   }
 }
 
-/* ── Auth pages (login / register) ───────────────────────────────────────── */
-/* Full-height, centered shell with a soft branded backdrop. */
+/* ── Auth pages (login / register) — D'Law premium theme ─────────────────── */
+/* Deep navy hero backdrop with a teal glow; a white card floats on top. */
 .auth-shell {
   min-height: 100vh;
   display: flex;
@@ -441,131 +441,529 @@ pre.transcript {
   align-items: center;
   justify-content: center;
   padding: 2.5rem 1.25rem;
+  font-family: "Hanken Grotesk", system-ui, sans-serif;
+  color: #0e1b39;
   background:
-    radial-gradient(1100px 520px at 50% -8%, rgba(0, 102, 204, 0.09), transparent 60%),
-    #ffffff;
+    radial-gradient(900px 520px at 50% -12%, rgba(19, 165, 148, 0.2), transparent 60%),
+    radial-gradient(700px 420px at 100% 110%, rgba(19, 165, 148, 0.12), transparent 60%),
+    linear-gradient(180deg, #0a1430 0%, #0e1c40 100%);
 }
 
 .auth-brand {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 1.5rem;
+  gap: 0.55rem;
+  margin-bottom: 1.7rem;
   text-decoration: none;
 }
 .auth-brand:hover {
   text-decoration: none;
 }
 .auth-brand .logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #0066cc, #0052a3);
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #13a594, #0c8475);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
-  box-shadow: 0 6px 16px rgba(0, 102, 204, 0.3);
+  color: #fff;
+  font-family: "Spectral", Georgia, serif;
+  font-weight: 700;
+  font-size: 30px;
+  box-shadow: 0 12px 28px rgba(19, 165, 148, 0.45);
 }
 .auth-brand .wordmark {
-  font-size: 1.5rem;
+  font-family: "Spectral", Georgia, serif;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #000000;
+  color: #ffffff;
 }
 .auth-brand .tagline {
-  font-size: 0.85rem;
-  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #aab6d6;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 432px;
   margin: 0;
   background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2.25rem 2rem;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e5ebf4;
+  border-radius: 22px;
+  padding: 2.4rem 2.1rem;
+  box-shadow: 0 30px 72px rgba(5, 12, 30, 0.5);
 }
-/* Don't inherit the .card hover lift if combined. */
 .auth-card:hover {
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 30px 72px rgba(5, 12, 30, 0.5);
 }
 .auth-card h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.35rem;
+  font-family: "Spectral", Georgia, serif;
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.4rem;
   text-align: center;
+  color: #0e1b39;
 }
 .auth-sub {
   text-align: center;
-  color: var(--muted);
-  font-size: 0.92rem;
-  margin: 0 0 1.5rem;
+  color: #51607a;
+  font-size: 0.95rem;
+  margin: 0 0 1.6rem;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.05rem;
   margin: 0;
 }
 .auth-form label {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0e1b39;
+}
+.auth-form input {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #d6deea;
+  border-radius: 11px;
+  background: #f3f6fb;
+  color: #0e1b39;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.auth-form input::placeholder {
+  color: #94a1ba;
+}
+.auth-form input:focus {
+  outline: none;
+  border-color: #13a594;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(19, 165, 148, 0.16);
 }
 .auth-optional {
-  font-weight: 400;
-  color: var(--muted);
+  font-weight: 500;
+  color: #94a1ba;
 }
 
 .auth-submit {
   width: 100%;
-  margin-top: 0.4rem;
-  padding: 0.7rem 1rem;
-  background: var(--accent);
+  margin-top: 0.5rem;
+  padding: 0.82rem 1rem;
+  background: linear-gradient(140deg, #13a594, #0c8475);
   color: #ffffff;
   border: 0;
-  border-radius: 8px;
-  font-size: 0.98rem;
-  font-weight: 600;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  box-shadow: 0 12px 26px rgba(19, 165, 148, 0.32);
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 .auth-submit:hover {
-  background: #0052a3;
+  transform: translateY(-2px);
+  filter: brightness(1.05);
 }
 
 .auth-alt {
   margin: 1.5rem 0 0;
   text-align: center;
-  font-size: 0.9rem;
-  color: var(--muted);
+  font-size: 0.92rem;
+  color: #51607a;
 }
 .auth-alt a {
-  font-weight: 600;
+  color: #0c8475;
+  font-weight: 700;
+  text-decoration: none;
+}
+.auth-alt a:hover {
+  text-decoration: underline;
 }
 
 .auth-note {
-  margin-top: 1.5rem;
-  max-width: 420px;
+  margin-top: 1.7rem;
+  max-width: 432px;
   text-align: center;
-  font-size: 0.75rem;
-  color: #999999;
-  line-height: 1.5;
+  font-size: 0.74rem;
+  color: #8696bb;
+  line-height: 1.55;
 }
 
 /* Error / info banners inside the card. */
 .auth-card .notice {
   margin: 0 0 1rem;
+  border-radius: 10px;
+  border-left: 3px solid #13a594;
+  background: #ecfaf6;
+  color: #0c6d61;
 }
 .auth-error {
-  border-left: 3px solid var(--danger);
-  background: #fdecea;
-  color: #b71c1c;
+  border-left: 3px solid #d6536a;
+  background: #fdecef;
+  color: #b3243b;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   D'Law — Hearing Prep workspace theme (scoped to #dlapp)
+   Tokens, fonts, keyframes and helpers for the redesigned app. Everything here
+   is namespaced under #dlapp so it never collides with the legacy/auth styles
+   above. Component layout is done with inline styles that read these vars.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+#dlapp {
+  --bg: #e9edf4;
+  --surface: #ffffff;
+  --surface-2: #f3f6fb;
+  --surface-3: #e7edf6;
+  --ink: #0e1b39;
+  --ink-soft: #51607a;
+  --ink-mute: #94a1ba;
+  --line: #e5ebf4;
+  --line-strong: #d6deea;
+  --navy: #0a1430;
+  --navy-2: #0f1c40;
+  --navy-line: rgba(255, 255, 255, 0.07);
+  --navy-ink: #aab6d6;
+  --navy-ink-soft: #73809f;
+  --teal: #13a594;
+  --teal-strong: #0c8475;
+  --teal-soft: #dcf2ee;
+  --teal-on: #ffffff;
+  --green: #1c9d6d;
+  --green-soft: #d9f1e6;
+  --amber: #cf8a1e;
+  --amber-soft: #f7ecd5;
+  --rose: #d6536a;
+  --rose-soft: #f7dde2;
+  --shadow-sm: 0 1px 2px rgba(15, 30, 62, 0.06), 0 2px 6px rgba(15, 30, 62, 0.05);
+  --shadow-md: 0 8px 24px rgba(15, 30, 62, 0.1);
+  --shadow-lg: 0 24px 60px rgba(15, 30, 62, 0.2);
+  --font-serif: "Spectral", Georgia, serif;
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+#dlapp[data-mode="dark"] {
+  --bg: #070d1d;
+  --surface: #0f1830;
+  --surface-2: #15203e;
+  --surface-3: #1c2950;
+  --ink: #e9eefb;
+  --ink-soft: #a7b3d2;
+  --ink-mute: #6f7d9e;
+  --line: #1e2b4d;
+  --line-strong: #293a63;
+  --navy: #070d1f;
+  --navy-2: #0c1430;
+  --navy-line: rgba(255, 255, 255, 0.06);
+  --teal: #1cbaa6;
+  --teal-strong: #1cbaa6;
+  --teal-soft: rgba(28, 186, 166, 0.15);
+  --teal-on: #042320;
+  --green: #28b481;
+  --green-soft: rgba(40, 180, 129, 0.16);
+  --amber: #d99a2b;
+  --amber-soft: rgba(217, 154, 43, 0.16);
+  --rose: #e06a80;
+  --rose-soft: rgba(224, 106, 128, 0.16);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 26px 64px rgba(0, 0, 0, 0.62);
+}
+
+#dlapp ::selection {
+  background: rgba(19, 165, 148, 0.25);
+}
+#dlapp *::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+#dlapp *::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 9px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+#dlapp *::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-mute);
+  background-clip: padding-box;
+}
+
+/* Material Symbols Rounded icon helper. */
+#dlapp .msr {
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0;
+  user-select: none;
+}
+#dlapp .msr.fill {
+  font-variation-settings: "FILL" 1;
+}
+
+#dlapp button {
+  font-family: var(--font-sans);
+}
+#dlapp input {
+  font-family: var(--font-sans);
+}
+
+@keyframes dlFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dlFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dlPop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dlSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#dlapp .dl-spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: dlSpin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* Honour reduced-motion (the prototype didn't; the real build should). */
+@media (prefers-reduced-motion: reduce) {
+  #dlapp *,
+  #dlapp *::before,
+  #dlapp *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Print: hide everything except the bundle print-area while generating a PDF. */
+@media print {
+  body.dl-printing > *:not(.dl-print-root) {
+    display: none !important;
+  }
+  body.dl-printing .dl-print-root {
+    display: block !important;
+  }
+}
+.dl-print-root {
+  display: none;
+}
+
+/* ── Reusable workspace primitives (keep view JSX readable) ───────────────── */
+#dlapp .dl-eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--teal-strong);
+  margin-bottom: 6px;
+}
+#dlapp .dl-h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(26px, 3.2vw, 34px);
+  line-height: 1.1;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+#dlapp .dl-sub {
+  margin-top: 7px;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+#dlapp .dl-card-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+#dlapp .dl-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+}
+#dlapp .dl-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+#dlapp .dl-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+#dlapp .dl-view {
+  animation: dlFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+#dlapp .dl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+#dlapp .dl-btn:hover {
+  background: var(--surface-3);
+}
+#dlapp .dl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+#dlapp .dl-btn-primary {
+  border: none;
+  background: linear-gradient(140deg, var(--teal), var(--teal-strong));
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(19, 165, 148, 0.32);
+}
+#dlapp .dl-btn-primary:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(140deg, var(--teal), var(--teal-strong));
+}
+#dlapp .dl-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+#dlapp .dl-icon-btn:hover {
+  background: var(--surface-3);
+}
+
+#dlapp .dl-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+#dlapp .dl-chip:hover {
+  border-color: var(--teal);
+}
+#dlapp .dl-chip.active {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #fff;
+}
+
+#dlapp .dl-track {
+  height: 8px;
+  border-radius: 6px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+#dlapp .dl-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--teal);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#dlapp .dl-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+#dlapp .dl-field {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  outline: none;
+}
+#dlapp .dl-field:focus {
+  border-color: var(--teal);
+}
+
+#dlapp .dl-grid {
+  display: grid;
+  gap: 18px;
 }
