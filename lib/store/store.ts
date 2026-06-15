@@ -13,7 +13,7 @@ import type {
   WorkspaceState,
   FactGroup,
 } from "./types";
-import { seedCases, newCase as buildNewCase } from "./demo";
+import { newCase as buildNewCase } from "./demo";
 
 export const DEFAULT_PREFS: Preferences = {
   dark: false,
@@ -40,13 +40,14 @@ export function createCase(state: WorkspaceState, title: string): WorkspaceState
 
 export function deleteCase(state: WorkspaceState, id: string): WorkspaceState {
   const cases = state.cases.filter((c) => c.meta.id !== id);
-  if (cases.length === 0) {
-    // Never leave the workspace empty — reseed a fresh blank case.
-    const seeded = seedCases();
-    return { ...state, cases: seeded, activeCaseId: seeded[0].meta.id };
-  }
+  // The workspace may become empty — the UI then prompts the user to create a
+  // case (we no longer auto-reseed a blank one).
   const activeCaseId =
-    state.activeCaseId === id ? cases[0].meta.id : state.activeCaseId;
+    cases.length === 0
+      ? ""
+      : state.activeCaseId === id
+        ? cases[0].meta.id
+        : state.activeCaseId;
   return { ...state, cases, activeCaseId };
 }
 

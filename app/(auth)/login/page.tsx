@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { login } from "../actions";
+import { SubmitButton } from "../SubmitButton";
 
 // Sign-in form. Server component → posts to the `login` server action.
 // Field names (email, password, hidden next) are the contract — keep them.
@@ -44,9 +45,7 @@ export default async function LoginPage({
             required
           />
         </label>
-        <button type="submit" className="auth-submit">
-          Sign in
-        </button>
+        <SubmitButton label="Sign in" pendingLabel="Signing in…" />
       </form>
 
       <p className="auth-alt">

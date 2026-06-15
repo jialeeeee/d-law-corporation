@@ -70,15 +70,19 @@ function caseId(): string {
   return `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-/** A single blank case with a unique id — used to seed a user's empty workspace. */
+/** A single blank case with a unique id — used by the explicit create flow. */
 export function blankCase(): CaseData {
   const year = new Date().getFullYear();
   return emptyCase(caseId(), { title: "Untitled case", caseNo: `SCT 0001 / ${year}` });
 }
 
-/** The initial set of cases for a brand-new workspace: one blank case to fill in. */
+/**
+ * A brand-new workspace starts EMPTY — no auto-created case. The user must
+ * create their first case explicitly (see the create-first-case screen). This
+ * returns an empty list intentionally.
+ */
 export function seedCases(): CaseData[] {
-  return [blankCase()];
+  return [];
 }
 
 /** Build a fresh, empty case for the "Create a new case" flow. */

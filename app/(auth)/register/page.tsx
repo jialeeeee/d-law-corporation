@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { register } from "../actions";
+import { SubmitButton } from "../SubmitButton";
 
 // Registration form. Server component → posts to the `register` server action.
 // Field names (fullName, email, password, hidden next) are the contract — keep them.
@@ -54,9 +55,7 @@ export default async function RegisterPage({
             required
           />
         </label>
-        <button type="submit" className="auth-submit">
-          Create account
-        </button>
+        <SubmitButton label="Create account" pendingLabel="Creating account…" />
       </form>
 
       <p className="auth-alt">

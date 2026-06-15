@@ -574,6 +574,26 @@ pre.transcript {
   transform: translateY(-2px);
   filter: brightness(1.05);
 }
+.auth-submit:disabled {
+  opacity: 0.85;
+  cursor: progress;
+  transform: none;
+  filter: none;
+}
+.auth-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  display: inline-block;
+  animation: authspin 0.7s linear infinite;
+}
+@keyframes authspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .auth-alt {
   margin: 1.5rem 0 0;

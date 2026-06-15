@@ -22,7 +22,6 @@ import {
   DEFAULT_PREFS,
 } from "./store";
 import { loadWorkspaceAction, saveWorkspaceAction } from "./actions";
-import { seedCases } from "./demo";
 
 interface WorkspaceCtx {
   ready: boolean;
@@ -43,8 +42,8 @@ interface WorkspaceCtx {
 const Ctx = createContext<WorkspaceCtx | null>(null);
 
 function initialState(): WorkspaceState {
-  const cases = seedCases();
-  return { cases, activeCaseId: cases[0].meta.id, prefs: { ...DEFAULT_PREFS } };
+  // Empty until loaded from the DB (or until the user creates their first case).
+  return { cases: [], activeCaseId: "", prefs: { ...DEFAULT_PREFS } };
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {

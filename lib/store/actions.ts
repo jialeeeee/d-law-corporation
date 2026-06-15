@@ -11,7 +11,6 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { Preferences, WorkspaceState } from "./types";
 import { rowToCaseData, caseDataToRow } from "./map";
-import { blankCase } from "./demo";
 import { DEFAULT_PREFS } from "./store";
 
 /**
@@ -28,16 +27,9 @@ export async function loadWorkspaceAction(): Promise<WorkspaceState | null> {
       where: { userId },
       orderBy: { createdAt: "asc" },
     });
-    let cases = rows.map(rowToCaseData);
-
-    // Never leave the workspace empty — seed a single blank case (no demo data).
-    if (cases.length === 0) {
-      const blank = blankCase();
-      const created = await prisma.case.create({
-        data: { ...caseDataToRow(blank, userId), id: blank.meta.id },
-      });
-      cases = [rowToCaseData(created)];
-    }
+    // May be empty — a brand-new user has no cases until they create one. The UI
+    // shows a "create your first case" screen rather than auto-seeding one.
+    const cases = rows.map(rowToCaseData);
 
     let prefs: Preferences = { ...DEFAULT_PREFS };
     if (userId) {
@@ -47,7 +39,7 @@ export async function loadWorkspaceAction(): Promise<WorkspaceState | null> {
       }
     }
 
-    return { cases, activeCaseId: cases[0].meta.id, prefs };
+    return { cases, activeCaseId: cases[0]?.meta.id ?? "", prefs };
   } catch {
     return null;
   }

@@ -12,6 +12,7 @@ import { UIProvider, type ToastData, Icon } from "./ui";
 import { TopBar, type AppUser } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 import { EvidenceSlideOver } from "./EvidenceSlideOver";
+import { EmptyWorkspace } from "./EmptyWorkspace";
 import { DashboardView } from "./views/DashboardView";
 import { EvidenceView } from "./views/EvidenceView";
 import { TimelineView } from "./views/TimelineView";
@@ -21,7 +22,7 @@ import { ExportView } from "./views/ExportView";
 import { SettingsView } from "./views/SettingsView";
 
 export function HearingPrepApp({ user }: { user?: AppUser }) {
-  const { ready, prefs } = useWorkspace();
+  const { ready, cases, prefs } = useWorkspace();
   const [view, setView] = useState<ViewKey>("dashboard");
   const [drawer, setDrawer] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -56,9 +57,42 @@ export function HearingPrepApp({ user }: { user?: AppUser }) {
   const openEvidence = useCallback((id: string) => setEvSelected(id), []);
 
   const mobile = width < 900;
+  const dataMode = prefs.dark ? "dark" : "light";
+
+  // While the workspace is loading from the database, show a clear loading
+  // state (the user sees the system is working).
+  if (!ready) {
+    return (
+      <div id="dlapp" data-mode={dataMode}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            minHeight: "100vh",
+            color: "var(--ink-mute)",
+            fontWeight: 600,
+          }}
+        >
+          <span className="dl-spin" /> Loading your workspace…
+        </div>
+      </div>
+    );
+  }
+
+  // Brand-new account / no cases yet → prompt to create the first case.
+  if (cases.length === 0) {
+    return (
+      <div id="dlapp" data-mode={dataMode}>
+        <EmptyWorkspace user={user} />
+      </div>
+    );
+  }
 
   return (
-    <div id="dlapp" data-mode={prefs.dark ? "dark" : "light"}>
+    <div id="dlapp" data-mode={dataMode}>
       <UIProvider value={{ view, setView: navigate, showToast, openEvidence }}>
         <TopBar user={user} mobile={mobile} onToggleDrawer={() => setDrawer((d) => !d)} />
 
