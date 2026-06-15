@@ -1,6 +1,6 @@
-// P5 — case wizard. Step 1 (Evidence & documents) is live; later steps are
-// placeholders for the other tracks to wire to their API routes.
+// P5 — case wizard. Step 1 (Evidence & documents) + Step 2 (Hearing prep).
 import EvidenceUploader from "./EvidenceUploader";
+import HearingPrep from "./HearingPrep";
 
 export default function WizardPage() {
   return (
@@ -19,9 +19,7 @@ export default function WizardPage() {
           audio recordings. Agnes AI reads (or transcribes) each file, pulls out
           the key facts and dated events, and builds a single timeline ordered
           from earliest to latest. You choose which files to include; unclear
-          files are flagged so you can re-upload a cleaner copy. Your uploads stay
-          here even if you reload, and you can remove any file. Export the case
-          data to carry into the hearing-script step.
+          files are flagged so you can re-upload a cleaner copy.
         </p>
         <EvidenceUploader />
       </div>
@@ -29,10 +27,11 @@ export default function WizardPage() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>2 · Hearing prep</h3>
         <p className="muted" style={{ marginTop: 0 }}>
-          Paste your witness statement → <code>POST /api/hearing-script</code>,
-          then rehearse with <code>POST /api/mock-qa</code>. (Coming from the
-          court-appearance track.)
+          Agnes turns your evidence timeline into a court-ready hearing script,
+          then lets you practise against questions from both the Tribunal
+          Magistrate and the opposing party.
         </p>
+        <HearingPrep />
       </div>
     </div>
   );
