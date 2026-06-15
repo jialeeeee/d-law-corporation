@@ -20,7 +20,17 @@ export interface MaterialFact {
 
 // ───────────────────────── Feature 2 — Evidence + audio ─────────────────────
 
-export type EvidenceKind = "image" | "audio";
+// "document" covers PDFs and Office/text docs whose text is extracted server-side
+// (lib/evidence/extractText.ts) before being structured by Agnes. "image" goes
+// straight to Agnes vision. "audio" stays on the transcription track (Damien).
+export type EvidenceKind = "image" | "document" | "audio";
+
+/**
+ * Agnes's *suggestion* of how relevant a file is to a dispute. It is only a hint
+ * — the user decides what to include (agent.md §0.1: never decide the case for
+ * them). "irrelevant" files default to excluded but can be re-included.
+ */
+export type RelevanceLevel = "relevant" | "uncertain" | "irrelevant";
 
 /** A dated event pulled from evidence, used to build the case chronology. */
 export interface TimelineEvent {
@@ -32,11 +42,29 @@ export interface TimelineEvent {
   sourceFile?: string;
 }
 
-/** Structured extract from an image/document (vision). */
+/**
+ * Whether the extracted evidence is clean/complete enough to rely on. Drives the
+ * "your upload needs to be clearer" flag surfaced to the user (agent.md §0).
+ */
+export interface ExtractionQuality {
+  /** True when the content is legible and complete enough to use as-is. */
+  sufficient: boolean;
+  /** Model's self-rated confidence in the extraction, 0–1. */
+  confidence: number;
+  /** Concrete problems found, e.g. "image is blurry", "PDF has no text layer". */
+  issues: string[];
+  /** What the user should do to fix it, e.g. "re-scan at higher resolution". */
+  recommendation?: string;
+}
+
+/** Structured extract from an image or document. */
 export interface EvidenceExtract {
   sourceFile: string;
-  kind: "image";
-  /** Image transcript — all readable text in the image (OCR / read-out). */
+  /** "image" → Agnes vision; "document" → server text-extract then Agnes. */
+  kind: "image" | "document";
+  /** Original MIME type of the upload (e.g. image/png, application/pdf). */
+  mimeType?: string;
+  /** Full transcript — all readable text in the file (OCR / text layer). */
   extractedText: string;
   /** Plain-language summary of what the evidence shows. */
   summary: string;
@@ -48,7 +76,14 @@ export interface EvidenceExtract {
   language: string;
   /** SCT requires English; non-English material must be flagged for translation. */
   needsTranslation: boolean;
+  /** Plain-language note on how this relates to a dispute (or that it doesn't). */
   relevance: string;
+  /** Agnes's suggested relevance level — a hint; the user decides inclusion. */
+  relevanceLevel?: RelevanceLevel;
+  /** Quality flag — about LEGIBILITY ONLY (raised when the text couldn't be read). */
+  quality: ExtractionQuality;
+  /** Non-blocking processing note (e.g. AI summary was temporarily unavailable). */
+  processingNote?: string;
   /** Verbatim text the extract is grounded in (provenance — agent.md §0.5). */
   sourceQuote?: string;
   /** id of the MaterialFact this evidence supports, if linked. */
@@ -71,15 +106,35 @@ export interface Transcript {
   amounts: string[];
   names: string[];
   relevance: string;
+  /** Agnes's suggested relevance level — a hint; the user decides inclusion. */
+  relevanceLevel?: RelevanceLevel;
+  /** Non-blocking processing note (e.g. AI structuring was unavailable). */
+  processingNote?: string;
   linkedFactId?: string;
   evidenceLinked: boolean;
 }
 
-/** Request body for POST /api/evidence (vision extract). */
+/**
+ * Request body for POST /api/evidence. Accepts any supported evidence file —
+ * images (PNG/JPG/WebP), PDFs, Office docs (DOCX) and plain text. Provide the
+ * bytes either as a base64 string or a fetchable URL.
+ *
+ * `imageUrl` / `imageBase64` are kept as aliases for backward compatibility;
+ * `fileUrl` / `fileBase64` are preferred for non-image uploads.
+ */
 export interface EvidenceRequest {
-  imageUrl?: string;
+  /** Preferred: base64-encoded file bytes (no data: prefix needed). */
+  fileBase64?: string;
+  /** Preferred: a fetchable URL to the file. */
+  fileUrl?: string;
+  /** Back-compat alias for fileBase64 (images). */
   imageBase64?: string;
+  /** Back-compat alias for fileUrl (images). */
+  imageUrl?: string;
+  /** Original file name, e.g. "invoice-2026-01.pdf" — used for provenance. */
   sourceFile: string;
+  /** MIME type of the upload; inferred from sourceFile when omitted. */
+  mimeType?: string;
 }
 
 /** Request body for POST /api/transcribe. */
@@ -87,6 +142,29 @@ export interface TranscribeRequest {
   audioUrl?: string;
   audioBase64?: string;
   sourceFile: string;
+}
+
+/**
+ * The handoff artifact from Feature 2 → Feature 6. After the user uploads all
+ * their evidence, this bundles every extract plus one merged, chronologically
+ * ordered timeline and de-duplicated entities. Track B (hearing script / mock
+ * Q&A) consumes this as the structured source for building the case narrative.
+ */
+export interface CaseEvidenceBundle {
+  /** ISO timestamp the bundle was generated. */
+  generatedAt: string;
+  /** Per-file structured extracts. */
+  evidence: EvidenceExtract[];
+  /** All timeline events across files, ordered earliest → latest. */
+  timeline: TimelineEvent[];
+  /** De-duplicated entities gathered across all evidence. */
+  entities: {
+    dates: string[];
+    amounts: string[];
+    names: string[];
+  };
+  /** Not-legal-advice line (agent.md §0.1). */
+  indicativeNote: string;
 }
 
 // ─────────────────── Feature 6 — Hearing script + mock Q&A ───────────────────

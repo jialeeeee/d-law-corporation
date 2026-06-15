@@ -1,5 +1,7 @@
 # Justifi — agent.md
 
+**Doc version: v0.4.2** · see [Changelog](#changelog) for history.
+
 **Mission:** help self-represented litigants at Singapore's Small Claims Tribunal (SCT)
 turn their own account into a clear, court-ready case — eligibility, evidence, claim value,
 negotiation, and appearance prep. Powered by **Agnes AI** (OpenAI-compatible), grounded in the
@@ -10,13 +12,29 @@ Read Section 0 before writing a line. Work in your branch (Section 4), open smal
 
 ---
 
+## Changelog
+
+Bump this on every meaningful change so we can trace what moved and when (newest first).
+
+| Version | Date | Change |
+| --- | --- | --- |
+| **v0.4.2** | 2026-06-15 | **Audio language accuracy + streamed upload.** English speech was being transcribed as Malay — Whisper was auto-detecting the language wrong and we never reported what it detected. Fix: `/api/transcribe` takes a **language hint** (UI selector, defaults to **English** per SCT; "Auto-detect" + Chinese/Malay/Tamil options), uses Whisper `verbose_json` to report the **detected** language, and **never translates** (uses `/transcriptions`, transcript stays verbatim in the spoken language). `needsTranslation` is set from the actual language. Also: audio now uploads as **streamed multipart/form-data** instead of base64-in-JSON, fixing "Failed to fetch" / 400 on larger audio (base64 bodies hit a ~8 MB framework limit). `transcribe()` gains `audioBlob` + `language`. |
+| v0.4.1 | 2026-06-15 | **Audio fix + Agnes STT finding.** Uploading audio gave "Failed to fetch" because the transcription call **hung ~32s** (SDK retrying) before erroring, dropping the browser connection. Fix: transcription now **fails fast** (`maxRetries:0`, 20s timeout) → clear error in ~1s. **Confirmed: Agnes offers NO speech-to-text model** — `/v1/models` lists only `agnes-1.5-flash`, `agnes-2.0-flash`, 2 image + 1 video model; the audio endpoint returns `503 no available channel for whisper-1`. So transcription is now **env-configurable** to any OpenAI-compatible Whisper backend without code changes: `TRANSCRIBE_BASE_URL` / `TRANSCRIBE_API_KEY` / `TRANSCRIBE_MODEL` (fall back to `AGNES_*`). `.ogg`/mp3/wav/m4a/webm/flac supported once a backend is set. |
+| v0.4.0 | 2026-06-15 | **Relevance control, persistence, and audio.** (1) **Quality flag fixed** — it's now LEGIBILITY-only; readable-but-irrelevant files are no longer mislabelled "not clear enough." Agnes now *suggests* a `relevanceLevel` (`relevant`/`uncertain`/`irrelevant`) and the user toggles **include/exclude** per file — only included files feed the timeline + export (user has final say, agent.md §0.1). A failed AI summary now shows a neutral `processingNote`, not "upload a clearer copy." (2) **Persistence** — uploads + results saved to `localStorage`, survive reload; per-file **Remove** + **Clear all**. (3) **Audio** — `/api/transcribe` implemented (isolated on this branch; Damien's sub-track): `transcribe()` → Agnes `chatJson` builds a `Transcript` with timeline. Accepts all common audio formats; audio events merge into the case timeline. **NOTE:** verified Agnes's speech-to-text endpoint is currently unreachable (connection error) — the pipeline degrades with a clear message and is swappable via `setTranscribeProvider()`. New types: `RelevanceLevel`; `EvidenceExtract`/`Transcript` gain `relevanceLevel` + `processingNote`. |
+| v0.3.0 | 2026-06-15 | **F2 → multi-file case timeline + Track B handoff.** The wizard now accepts **many files at once**; Agnes extracts each, and the UI merges every dated event into **one chronological case timeline** (de-duplicated dates/amounts/names). New **export**: `case-evidence.json` (`CaseEvidenceBundle`) and `case-timeline.txt` — the structured handoff Track B (hearing script / mock Q&A) builds the narrative from. **Bulletproof file types:** added more image formats (HEIC/HEIF/AVIF), `.rtf`, graceful legacy `.doc` flag, and **magic-byte sniffing** so files with a missing/wrong extension still work. Timeline events now carry `sourceFile` (provenance). New shared type `CaseEvidenceBundle`. **Fix:** `serverExternalPackages: ["pdf-parse","mammoth","pdfjs-dist"]` in `next.config.mjs` — these were being webpack-bundled and crashed `/api/evidence` with a 500 ("Object.defineProperty called on non-object") for every upload. |
+| v0.2.0 | 2026-06-15 | **F2 Evidence organiser — documents implemented** (branch `feat/evidence-docs`). `POST /api/evidence` now accepts **images (PNG/JPG/WebP), PDF, DOCX and text**. Images go to Agnes vision; PDF/DOCX/text are extracted server-side (`lib/evidence/extractText.ts`, via `pdf-parse` + `mammoth`) then structured by Agnes. Adds an **extraction-quality flag** (`ExtractionQuality`) that raises poor/incomplete uploads to the user, a full-text **transcript download**, timeline + entity extraction, and the non-English translation flag. New shared types: `ExtractionQuality`, `EvidenceKind` gains `"document"`, `EvidenceExtract` gains `kind:"image"\|"document"`, `mimeType`, `quality`; `EvidenceRequest` gains `fileBase64`/`fileUrl`/`mimeType` (image fields kept as aliases). Wizard UI step 1 now live (`app/(web)/wizard/EvidenceUploader.tsx`). |
+| v0.1.0 | 2026-06-15 | Foundation on `main`: Next.js scaffold, Agnes client (`chatJson`/`visionJson`/`transcribe`), SCT ruleset, Prisma schema, shared contracts; F2/F6 scoped; API routes as 501 stubs. |
+
+---
+
 ## ⚠️ SCOPE — READ FIRST (updated 2026-06-15)
 
 The team narrowed scope. **Only two features are active.** Do NOT build the deferred ones.
 
 | Feature | Status | Track / branch |
 | --- | --- | --- |
-| **F2 — Evidence organiser + audio transcription** | ✅ **ACTIVE** | `feat/evidence-audio` |
+| **F2 — Evidence organiser (docs + images)** | ✅ **ACTIVE** (docs shipped v0.2.0) | `feat/evidence-docs` |
+| **F2 — Audio transcription** | ✅ **ACTIVE** | `feat/evidence-audio` |
 | **F6 — Hearing script + mock Q&A** | ✅ **ACTIVE** | `feat/court-appearance` |
 | F1 — Eligibility checker | ⛔ deferred | — |
 | F3 — Claim amount calculator | ⛔ deferred | — |
@@ -83,7 +101,8 @@ model directly.
 
 | Surface | Agnes helper | Agnes model | What Agnes does |
 | --- | --- | --- | --- |
-| **F2** `POST /api/evidence` | `visionJson()` | `agnes-2.0-flash` (vision) | Reads the uploaded image and returns the image transcript (`extractedText`), summary, timeline of dated events, plus dates/amounts/names. |
+| **F2** `POST /api/evidence` (image) | `visionJson()` | `agnes-2.0-flash` (vision) | Reads the uploaded image and returns the transcript (`extractedText`), summary, timeline of dated events, dates/amounts/names, and a `quality` flag. |
+| **F2** `POST /api/evidence` (doc) | text-extract → `chatJson()` | `agnes-2.0-flash` | PDF/DOCX/text extracted by `lib/evidence/extractText.ts`, then Agnes structures it into the same `EvidenceExtract`. Scanned/empty docs are flagged via `quality.sufficient=false`. |
 | **F2** `POST /api/transcribe` | `transcribe()` → then `chatJson()` | Agnes `audio/transcriptions` (unconfirmed; swappable) → `agnes-2.0-flash` | Transcribes the audio, then structures it into `Transcript` (transcript, summary, timeline, language, needsTranslation, …). |
 | **F6** `POST /api/hearing-script` | `chatJson()` | `agnes-2.0-flash` | Turns the witness statement into a `HearingScript` (opening, chronology tied to evidence, relief sought). |
 | **F6** `POST /api/mock-qa` | `chatJson()` | `agnes-2.0-flash` | Simulates the Tribunal Magistrate's probing questions and gives feedback (`MockQATurn`). |
@@ -106,10 +125,11 @@ lib/agnes/client.ts ......... chatJson / visionJson / transcribe (Lead owns)
 lib/agnes/parseJson.ts ...... defensive JSON parse (Lead owns)
 lib/sct/ruleset.ts .......... SCT grounding (Lead owns)
 lib/db.ts ................... Prisma client singleton (Lead owns)
+lib/evidence/extractText.ts . F2 doc text extraction (pdf/docx/text) — Track A
 lib/supabase/*.ts .......... auth clients (browser/server) + session helpers (Lead owns)
 middleware.ts .............. session refresh + route protection (Lead owns)
 prisma/schema.prisma ........ data model (Lead owns)
-app/api/evidence ........... F2 (vision) — ACTIVE
+app/api/evidence ........... F2 (image + document) — ACTIVE (v0.2.0)
 app/api/transcribe ......... F2 (audio) — ACTIVE
 app/api/hearing-script ..... F6 — ACTIVE
 app/api/mock-qa ............ F6 — ACTIVE
@@ -127,7 +147,7 @@ Rule of thumb: **work only inside your own folder.** The only shared files are
 `lib/types.ts` is the single source of truth. When your feature needs a new type, the **Lead adds it
 there via a tiny PR**, then you import it. Active types:
 
-- F2: `EvidenceExtract`, `Transcript`, `MaterialFact`, `TimelineEvent`, `EvidenceRequest`, `TranscribeRequest`
+- F2: `EvidenceExtract`, `ExtractionQuality`, `RelevanceLevel`, `CaseEvidenceBundle` (F2→F6 handoff), `Transcript`, `MaterialFact`, `TimelineEvent`, `EvidenceRequest`, `TranscribeRequest`, `EvidenceKind` (`"image"|"document"|"audio"`)
 - F6: `HearingScript`, `HearingScriptSection`, `MockQATurn`, `MockQAExchange`, `HearingScriptRequest`, `MockQARequest`
 
 ---
@@ -169,15 +189,18 @@ by the signed-in `userId` (see §5). Get the current user server-side via
 `POST /v1/audio/transcriptions`. If present, the default `transcribe()` provider works. If absent,
 call `setTranscribeProvider()` (Whisper / AssemblyAI / local) so the feature ships regardless.
 **Spec:**
-- `POST /api/evidence { imageUrl|imageBase64, sourceFile } -> EvidenceExtract`
-  → vision extract with **image transcript** (`extractedText`), **summary**, **timeline[]** of
-  dated events, plus `dates/amounts/names`, `needsTranslation`, `sourceQuote`.
-- `POST /api/transcribe { audioUrl|audioBase64, sourceFile } -> Transcript`
+- `POST /api/evidence { fileBase64|fileUrl, sourceFile, mimeType? } -> EvidenceExtract` ✅ **DONE (v0.2.0)**
+  → accepts **images (PNG/JPG/WebP), PDF, DOCX, text**. Images → Agnes vision; docs are extracted by
+  `lib/evidence/extractText.ts` then structured by Agnes. Returns **transcript** (`extractedText`),
+  **summary**, **timeline[]**, `dates/amounts/names`, `language`, `needsTranslation`, `sourceQuote`,
+  and a **`quality`** flag (`ExtractionQuality`) that raises blurry/scanned/empty uploads to the user.
+  (Image fields `imageUrl|imageBase64` still accepted as aliases.)
+- `POST /api/transcribe { audioUrl|audioBase64, sourceFile } -> Transcript` (audio sub-track)
   → run the raw transcript through `chatJson` to get `{ transcript, summary, timeline, language, needsTranslation, dates[], amounts[], names[], relevance }`.
 - Organise: link each `EvidenceExtract`/`Transcript` to the matching `MaterialFact` (`evidenceLinked=true`).
 - Flag non-English (translation required). Make the transcript downloadable — the SCT requires
-  audio/video evidence to be submitted with a transcript.
-**Done when:** image/audio → structured extract incl. transcript, summary, timeline; non-English flagged; transcript exportable; provider swappable.
+  audio/video evidence to be submitted with a transcript. (Doc/image transcript download shipped in the wizard UI.)
+**Done when:** image/doc/audio → structured extract incl. transcript, summary, timeline; non-English flagged; poor uploads flagged; transcript exportable; audio provider swappable.
 
 ### TRACK B — Feature 6 (Court appearance: hearing script + mock Q&A)
 **Branch:** `feat/court-appearance` · **Owns:** `app/api/hearing-script/*`, `app/api/mock-qa/*` + their UI.
