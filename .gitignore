@@ -43,3 +43,8 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 Thumbs.db
+.history/
+
+# local AI / tooling state — never push
+.claude/
+.aider*
