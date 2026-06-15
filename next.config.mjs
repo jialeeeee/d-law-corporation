@@ -9,6 +9,16 @@ const nextConfig = {
   // bundles them into the server build ("Object.defineProperty called on
   // non-object"). Mark them external so Next require()s them at runtime instead.
   serverExternalPackages: ["pdf-parse", "mammoth", "pdfjs-dist"],
+
+  experimental: {
+    // The workspace is persisted via a Server Action that receives the whole
+    // case state — including the text extracted from every uploaded file. The
+    // default 1 MB Server Action body cap is exceeded after a few documents,
+    // which made the save (and the next upload) fail. Give it real headroom.
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
 };
 
 export default nextConfig;

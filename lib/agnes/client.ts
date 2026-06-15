@@ -25,6 +25,14 @@ const JSON_GUARD =
 
 let _client: OpenAI | null = null;
 
+/**
+ * How long to wait for an Agnes chat/vision response before failing (ms). Without
+ * this the SDK default is 10 MINUTES with 2 retries, so a slow/flaky Agnes call
+ * hangs the upload request until the browser gives up with "Failed to fetch".
+ * One bounded retry keeps a clear error arriving in well under a minute instead.
+ */
+const AGNES_TIMEOUT_MS = 60_000;
+
 /** Lazily construct the OpenAI-compatible client pointed at Agnes. */
 function client(): OpenAI {
   if (_client) return _client;
@@ -34,7 +42,14 @@ function client(): OpenAI {
       "AGNES_KEY is not set. Add it to .env.local (server-side only) — see .env.example.",
     );
   }
-  _client = new OpenAI({ apiKey, baseURL: AGNES_BASE_URL });
+  _client = new OpenAI({
+    apiKey,
+    baseURL: AGNES_BASE_URL,
+    // Bound the wait so a slow Agnes returns a clean 502 (handled → toast)
+    // instead of hanging long enough for the browser to throw "Failed to fetch".
+    timeout: AGNES_TIMEOUT_MS,
+    maxRetries: 1,
+  });
   return _client;
 }
 

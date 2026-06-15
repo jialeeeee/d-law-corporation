@@ -71,7 +71,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated.current) return;
     const t = setTimeout(() => {
-      void saveWorkspaceAction(state);
+      // Best-effort persistence. Catch transport-level rejections (e.g. a body
+      // that exceeds the Server Action limit) here so they never bubble up as an
+      // unhandled "Failed to fetch" rejection — the session stays usable.
+      void saveWorkspaceAction(state).catch(() => {});
     }, 600);
     return () => clearTimeout(t);
   }, [state]);
