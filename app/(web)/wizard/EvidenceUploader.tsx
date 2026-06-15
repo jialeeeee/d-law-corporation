@@ -287,21 +287,25 @@ function FileRow({ item }: { item: Item }) {
   const r = item.result;
   const ok = r?.quality?.sufficient;
   return (
-    <details className="card" style={{ margin: "0.6rem 0" }}>
-      <summary style={{ cursor: "pointer", display: "flex", gap: "0.6rem", alignItems: "center" }}>
-        <span style={{ flex: 1, fontWeight: 600 }}>{item.name}</span>
+    <div className="card" style={{ margin: "0.6rem 0" }}>
+      <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+        <span style={{ flex: 1, fontWeight: 600, wordBreak: "break-word" }}>
+          {item.name}
+        </span>
         {item.status === "processing" && (
           <span className="badge">
             <span className="spinner" /> reading…
           </span>
         )}
-        {item.status === "error" && <span className="badge badge-warn">⚠ failed</span>}
+        {item.status === "error" && (
+          <span className="badge badge-warn">⚠ failed</span>
+        )}
         {item.status === "done" && (
           <span className={`badge ${ok ? "badge-ok" : "badge-warn"}`}>
             {ok ? "✓ read" : "⚠ unclear"}
           </span>
         )}
-      </summary>
+      </div>
 
       {item.status === "error" && (
         <div className="flag error" style={{ marginTop: "0.75rem" }}>
@@ -328,23 +332,28 @@ function FileRow({ item }: { item: Item }) {
               )}
             </div>
           )}
+
           {r.summary && (
             <>
               <p className="field-label">Summary</p>
-              <p style={{ margin: "0 0 0.75rem" }}>{r.summary}</p>
+              <p style={{ margin: "0 0 0.9rem" }}>{r.summary}</p>
             </>
           )}
-          {r.extractedText && (
-            <details>
-              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-                View extracted text
-              </summary>
-              <pre className="transcript">{r.extractedText}</pre>
-            </details>
+
+          {/* Extracted text shown directly (this IS the image/file → text result) */}
+          <p className="field-label">
+            Extracted text {r.kind === "image" ? "(read from image)" : ""}
+          </p>
+          {r.extractedText ? (
+            <pre className="transcript">{r.extractedText}</pre>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>
+              No text could be read from this file.
+            </p>
           )}
         </div>
       )}
-    </details>
+    </div>
   );
 }
 
