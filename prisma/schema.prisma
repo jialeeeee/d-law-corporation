@@ -16,6 +16,10 @@ datasource db {
 
 model Case {
   id        String   @id @default(cuid())
+  // Owner = Supabase Auth user id (uuid). Nullable for now so in-progress F2/F6
+  // work isn't broken; ALWAYS filter Case/Evidence queries by userId (Prisma
+  // bypasses Supabase RLS, so ownership is enforced in app code). See agent.md §5a.
+  userId    String?
   title     String?
   status    String   @default("draft")
 
@@ -28,6 +32,8 @@ model Case {
 
   evidence Evidence[]
   facts    MaterialFact[]
+
+  @@index([userId])
 }
 
 model Evidence {
