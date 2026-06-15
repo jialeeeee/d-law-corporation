@@ -17,7 +17,7 @@ The team narrowed scope. **Only two features are active.** Do NOT build the defe
 | Feature | Status | Track / branch |
 | --- | --- | --- |
 | **F2 — Evidence organiser + audio transcription** | ✅ **ACTIVE** | `feat/evidence-audio` |
-| **F6 — Hearing script + mock Q&A** | ✅ **ACTIVE** | `feat/court-appearance` |
+| **F6 — Hearing script + mock Q&A** | ✅ **DONE** | `feat/court-appearance` |
 | F1 — Eligibility checker | ⛔ deferred | — |
 | F3 — Claim amount calculator | ⛔ deferred | — |
 | F4 — e-Negotiation coach | ⛔ deferred | — |
@@ -62,7 +62,7 @@ spec in Section 4 for if/when they return, but are out of scope for now.
   - text/vision: `agnes-2.0-flash` · image: `agnes-image-2.1-flash` / `agnes-image-2.0-flash` · video: `agnes-video-v2.0`
   - audio transcription: **unconfirmed** — see Track 3 (F2).
 - **Commands:** `npm run dev` · `npm run build` · `npm run db:push`
-- **Path alias:** `@/*` → repo root (already set in `tsconfig.json`).
+- **Path alias:** `@/*` → repo root (already set in `tsconfig.json`). `"ignoreDeprecations": "6.0"` added to silence TS7 `baseUrl` deprecation warning.
 
 ---
 
@@ -78,8 +78,8 @@ model directly.
 | --- | --- | --- | --- |
 | **F2** `POST /api/evidence` | `visionJson()` | `agnes-2.0-flash` (vision) | Reads the uploaded image and returns the image transcript (`extractedText`), summary, timeline of dated events, plus dates/amounts/names. |
 | **F2** `POST /api/transcribe` | `transcribe()` → then `chatJson()` | Agnes `audio/transcriptions` (unconfirmed; swappable) → `agnes-2.0-flash` | Transcribes the audio, then structures it into `Transcript` (transcript, summary, timeline, language, needsTranslation, …). |
-| **F6** `POST /api/hearing-script` | `chatJson()` | `agnes-2.0-flash` | Turns the witness statement into a `HearingScript` (opening, chronology tied to evidence, relief sought). |
-| **F6** `POST /api/mock-qa` | `chatJson()` | `agnes-2.0-flash` | Simulates the Tribunal Magistrate's probing questions and gives feedback (`MockQATurn`). |
+| **F6** `POST /api/hearing-script` | `chatJson()` | `agnes-2.0-flash` | Accepts witness statement + optional evidence extracts from Track A. Returns `HearingScript` (opening, chronology tied to source evidence files, relief sought). |
+| **F6** `POST /api/mock-qa` | `chatJson()` | `agnes-2.0-flash` | Alternates between Tribunal Magistrate (even turns) and opposing party (odd turns). Returns `MockQATurnExtended`: question, questionFrom, feedbackOnLastAnswer, recommendedAnswer, tips[], done, indicativeNote. |
 
 Notes for the demo / write-up:
 - The Agnes model ids are centralised in `AGNES_MODELS` (`lib/agnes/client.ts`).
@@ -124,17 +124,18 @@ there via a tiny PR**, then you import it. Active types:
 
 ## 4. Work split — active tracks
 
-**Claim your track here (fill in names), then build only inside that track's folder:**
+**Team assignments — build only inside your track's folder** (suggested split; swap to match strengths):
 
 | Track | Branch | Folder you own | Owner |
 | --- | --- | --- | --- |
-| A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | _(name)_ |
-| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | _(name)_ |
-| P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | _(name)_ |
-| Foundation + merges | `main` | `lib/*`, `prisma/*` | Lead (you) |
+| A — Evidence + audio (F2) | `feat/evidence-audio` | `app/api/evidence/*`, `app/api/transcribe/*` | **Jing Yuan** → `/api/evidence` · **Damien** → `/api/transcribe` |
+| B — Court appearance (F6) | `feat/court-appearance` | `app/api/hearing-script/*`, `app/api/mock-qa/*` | **Jia Le** ✅ DONE |
+| P5 — Wizard UI | `feat/wizard` | `app/(web)/*` | **Donna** |
+| Foundation + merges | `main` | `lib/*`, `prisma/*` | **Jun Sheng** (Lead) |
 
-If two people are on one track, split by endpoint (e.g. one takes `/api/evidence`, the other
-`/api/transcribe`). The UX-leaning person should take P5. **Don't edit another track's folder.**
+Jing Yuan & Damien share the `feat/evidence-audio` branch, split by endpoint as shown; everyone
+else owns their track solo. **Don't edit another track's folder** — need a change in `lib/types.ts`
+or `prisma/schema.prisma`? Ping Jun Sheng for a quick PR.
 
 ### Foundation — Lead (DONE, on `main`)
 **Owns:** `lib/types.ts`, `lib/agnes/*`, `lib/sct/ruleset.ts`, `lib/db.ts`, `prisma/schema.prisma`,
@@ -157,16 +158,23 @@ call `setTranscribeProvider()` (Whisper / AssemblyAI / local) so the feature shi
   audio/video evidence to be submitted with a transcript.
 **Done when:** image/audio → structured extract incl. transcript, summary, timeline; non-English flagged; transcript exportable; provider swappable.
 
-### TRACK B — Feature 6 (Court appearance: hearing script + mock Q&A)
-**Branch:** `feat/court-appearance` · **Owns:** `app/api/hearing-script/*`, `app/api/mock-qa/*` + their UI.
-**Spec:**
-- `POST /api/hearing-script { statement } -> HearingScript` — plain-language opening, chronology
-  walkthrough, each material fact tied to its evidence, relief sought. Derived ONLY from the user's
-  witness statement; stress explaining every component (each invoice/defect).
-- `POST /api/mock-qa { statement, history[] } -> MockQATurn` — simulate the Tribunal Magistrate's
-  likely probing ("how do you know X?", "where's your proof of Y?", "explain this invoice"), and give
-  feedback on the user's last answer. Iterative loop.
-**Done when:** script derived only from the statement; mock Q&A loops with constructive feedback; all carry the not-advice note.
+### TRACK B — Feature 6 (Court appearance: hearing script + mock Q&A) ✅ DONE
+**Branch:** `feat/court-appearance` · **Owner:** Jia Le · **Owns:** `app/api/hearing-script/*`, `app/api/mock-qa/*`.
+
+- `POST /api/hearing-script { statement, evidence? } -> HearingScript` — accepts the witness
+  statement plus optional `EvidenceExtract[]|Transcript[]` from Track A. Returns a plain-language
+  opening, chronology with each event tied to its source evidence file (`evidenceRefs`), and exact
+  relief sought. Derived only from provided data — nothing invented.
+- `POST /api/mock-qa { statement, history[] } -> MockQATurnExtended` — alternates questioner:
+  even turns = Tribunal Magistrate, odd turns = opposing party. Each turn returns:
+  `question`, `questionFrom ("magistrate"|"opponent")`, `feedbackOnLastAnswer` (on prior answer),
+  `recommendedAnswer` (suggested model answer for litigant), `tips[]`, `done` (true after ≥6
+  exchanges), `indicativeNote`. `MockQATurnExtended` is a superset of `MockQATurn` — additive,
+  non-breaking. Exported from `app/api/mock-qa/route.ts` for use by the UI.
+
+Both endpoints: grounded with `rulesetToPrompt()`, call `chatJson()` on `agnes-2.0-flash`,
+parse defensively, always force-attach `INDICATIVE_NOTE`. Support `USE_MOCK=1` fixture shortcut.
+**Build:** ✅ `npm run build` passes with zero type errors.
 
 ### P5 — Wizard UI
 **Owns:** `app/(web)/*`. Surface the two active features as steps/tabs; call the routes above.
