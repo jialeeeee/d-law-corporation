@@ -25,6 +25,13 @@ export interface MaterialFact {
 // straight to Agnes vision. "audio" stays on the transcription track (Damien).
 export type EvidenceKind = "image" | "document" | "audio";
 
+/**
+ * Agnes's *suggestion* of how relevant a file is to a dispute. It is only a hint
+ * — the user decides what to include (agent.md §0.1: never decide the case for
+ * them). "irrelevant" files default to excluded but can be re-included.
+ */
+export type RelevanceLevel = "relevant" | "uncertain" | "irrelevant";
+
 /** A dated event pulled from evidence, used to build the case chronology. */
 export interface TimelineEvent {
   /** Date of the event. Keep the date text verbatim if it is ambiguous. */
@@ -69,9 +76,14 @@ export interface EvidenceExtract {
   language: string;
   /** SCT requires English; non-English material must be flagged for translation. */
   needsTranslation: boolean;
+  /** Plain-language note on how this relates to a dispute (or that it doesn't). */
   relevance: string;
-  /** Quality/sufficiency flag — raised to the user when the upload is too poor. */
+  /** Agnes's suggested relevance level — a hint; the user decides inclusion. */
+  relevanceLevel?: RelevanceLevel;
+  /** Quality flag — about LEGIBILITY ONLY (raised when the text couldn't be read). */
   quality: ExtractionQuality;
+  /** Non-blocking processing note (e.g. AI summary was temporarily unavailable). */
+  processingNote?: string;
   /** Verbatim text the extract is grounded in (provenance — agent.md §0.5). */
   sourceQuote?: string;
   /** id of the MaterialFact this evidence supports, if linked. */
@@ -94,6 +106,10 @@ export interface Transcript {
   amounts: string[];
   names: string[];
   relevance: string;
+  /** Agnes's suggested relevance level — a hint; the user decides inclusion. */
+  relevanceLevel?: RelevanceLevel;
+  /** Non-blocking processing note (e.g. AI structuring was unavailable). */
+  processingNote?: string;
   linkedFactId?: string;
   evidenceLinked: boolean;
 }

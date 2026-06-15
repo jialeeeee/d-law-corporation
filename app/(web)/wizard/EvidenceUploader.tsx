@@ -2,33 +2,73 @@
 
 // Feature 2 — Evidence organiser UI (feat/evidence-docs).
 //
-// The user uploads ALL their evidence (images / PDFs / Word / text). Each file
-// is sent to POST /api/evidence, where Agnes AI extracts the text and the dated
-// events. We then merge every file's events into ONE chronological case
-// timeline and let the user export a structured bundle (CaseEvidenceBundle) that
-// the hearing-script track (F6) builds the court narrative from.
-import { useCallback, useMemo, useRef, useState } from "react";
+// Upload ALL evidence (images / PDFs / Word / text / audio). Each file is sent
+// to Agnes — documents & images via /api/evidence, audio via /api/transcribe —
+// which extracts the text and dated events. Events from every INCLUDED file are
+// merged into one chronological case timeline, exportable as the handoff bundle
+// (CaseEvidenceBundle) the hearing-script track builds on.
+//
+// • The user decides what counts: Agnes only *suggests* relevance; an
+//   include/exclude toggle gives the user the final say (agent.md §0.1).
+// • Persistent: files + results are saved to localStorage so a page reload keeps
+//   everything. Nothing is removed unless the user deletes it.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CaseEvidenceBundle,
   EvidenceExtract,
+  RelevanceLevel,
   TimelineEvent,
+  Transcript,
 } from "@/lib/types";
 
-type Result = EvidenceExtract & { indicativeNote?: string };
+const STORAGE_KEY = "justifi.evidence.v1";
+
+const ACCEPT =
+  ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,.avif," +
+  ".pdf,.docx,.doc,.rtf,.txt,.md,.csv," +
+  ".mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm,.amr,.wma," +
+  "image/*,application/pdf,audio/*";
+
+const AUDIO_EXT = [
+  "mp3", "wav", "m4a", "aac", "ogg", "oga", "opus",
+  "flac", "webm", "mp4", "mpeg", "mpga", "amr", "wma", "3gp",
+];
+
+/** Normalised per-file result the UI renders (covers documents/images/audio). */
+interface Extracted {
+  sourceFile: string;
+  kind: "image" | "document" | "audio";
+  text: string;
+  summary: string;
+  timeline: TimelineEvent[];
+  dates: string[];
+  amounts: string[];
+  names: string[];
+  language: string;
+  needsTranslation: boolean;
+  relevance: string;
+  relevanceLevel?: RelevanceLevel;
+  /** Legibility flag (documents/images only). */
+  quality?: EvidenceExtract["quality"];
+  processingNote?: string;
+  indicativeNote?: string;
+}
 
 interface Item {
   id: string;
   name: string;
   status: "processing" | "done" | "error";
-  result?: Result;
+  included: boolean;
+  result?: Extracted;
   error?: string;
 }
 
-const ACCEPT =
-  ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,.avif," +
-  ".pdf,.docx,.doc,.rtf,.txt,.md,.csv,image/*,application/pdf";
+function isAudio(file: File): boolean {
+  if (file.type.toLowerCase().startsWith("audio/")) return true;
+  const ext = (/\.([a-z0-9]+)$/i.exec(file.name)?.[1] ?? "").toLowerCase();
+  return AUDIO_EXT.includes(ext);
+}
 
-/** Read a File into a bare base64 string (no data: prefix). */
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -41,33 +81,68 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-/** Best-effort parse of a free-text date into a sortable timestamp (D/M first). */
+function mapEvidence(d: EvidenceExtract & { indicativeNote?: string }): Extracted {
+  return {
+    sourceFile: d.sourceFile,
+    kind: d.kind,
+    text: d.extractedText ?? "",
+    summary: d.summary ?? "",
+    timeline: d.timeline ?? [],
+    dates: d.dates ?? [],
+    amounts: d.amounts ?? [],
+    names: d.names ?? [],
+    language: d.language ?? "Unknown",
+    needsTranslation: !!d.needsTranslation,
+    relevance: d.relevance ?? "",
+    relevanceLevel: d.relevanceLevel,
+    quality: d.quality,
+    processingNote: d.processingNote,
+    indicativeNote: d.indicativeNote,
+  };
+}
+
+function mapTranscript(d: Transcript & { indicativeNote?: string }): Extracted {
+  return {
+    sourceFile: d.sourceFile,
+    kind: "audio",
+    text: d.transcript ?? "",
+    summary: d.summary ?? "",
+    timeline: d.timeline ?? [],
+    dates: d.dates ?? [],
+    amounts: d.amounts ?? [],
+    names: d.names ?? [],
+    language: d.language ?? "Unknown",
+    needsTranslation: !!d.needsTranslation,
+    relevance: d.relevance ?? "",
+    relevanceLevel: d.relevanceLevel,
+    processingNote: d.processingNote,
+    indicativeNote: d.indicativeNote,
+  };
+}
+
+/** Best-effort parse of a free-text date to a sortable timestamp (D/M first). */
 function parseDate(s?: string): number | null {
   if (!s) return null;
-  // Prefer day/month/year (Singapore convention) for slash/dash dates.
   const m = s.match(/\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b/);
   if (m) {
-    const day = +m[1];
-    const mon = +m[2];
     const yr = m[3].length === 2 ? 2000 + +m[3] : +m[3];
-    const dt = new Date(yr, mon - 1, day);
+    const dt = new Date(yr, +m[2] - 1, +m[1]);
     if (!Number.isNaN(dt.getTime())) return dt.getTime();
   }
-  const t = Date.parse(s); // handles "3 Jan 2026", ISO, etc.
+  const t = Date.parse(s);
   return Number.isNaN(t) ? null : t;
 }
 
 const uniq = (arr: string[]) =>
   [...new Set(arr.map((x) => x.trim()).filter(Boolean))];
 
-/** Merge all files' events into one list ordered earliest → latest. */
-function sortedTimeline(results: Result[]): TimelineEvent[] {
-  const events = results.flatMap((r) => r.timeline ?? []);
-  return events
+function sortedTimeline(results: Extracted[]): TimelineEvent[] {
+  return results
+    .flatMap((r) => r.timeline ?? [])
     .map((e, i) => ({ e, i, t: parseDate(e.date) }))
     .sort((a, b) => {
       if (a.t === null && b.t === null) return a.i - b.i;
-      if (a.t === null) return 1; // undated events sink to the bottom
+      if (a.t === null) return 1;
       if (b.t === null) return -1;
       return a.t - b.t;
     })
@@ -76,14 +151,37 @@ function sortedTimeline(results: Result[]): TimelineEvent[] {
 
 export default function EvidenceUploader() {
   const [items, setItems] = useState<Item[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Load persisted items on mount (client only — avoids hydration mismatch).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setItems(JSON.parse(raw) as Item[]);
+    } catch {
+      /* ignore corrupt storage */
+    }
+    setLoaded(true);
+  }, []);
+
+  // Persist whenever items change (skip in-flight 'processing' entries).
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(items.filter((i) => i.status !== "processing")),
+      );
+    } catch {
+      /* quota exceeded — keep working in memory */
+    }
+  }, [items, loaded]);
+
   const update = useCallback(
     (id: string, patch: Partial<Item>) =>
-      setItems((prev) =>
-        prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
-      ),
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it))),
     [],
   );
 
@@ -93,29 +191,49 @@ export default function EvidenceUploader() {
         id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
         name: f.name,
         status: "processing",
+        included: true,
       }));
       setItems((prev) => [...prev, ...newItems]);
 
-      // Process sequentially to keep things gentle on the Agnes endpoint.
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const id = newItems[i].id;
         try {
-          const fileBase64 = await fileToBase64(file);
-          const res = await fetch("/api/evidence", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileBase64,
-              sourceFile: file.name,
-              mimeType: file.type || undefined,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data?.error ?? `Request failed (${res.status})`);
+          const base64 = await fileToBase64(file);
+          let result: Extracted;
+          if (isAudio(file)) {
+            const res = await fetch("/api/transcribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                audioBase64: base64,
+                sourceFile: file.name,
+                mimeType: file.type || undefined,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status})`);
+            result = mapTranscript(data);
+          } else {
+            const res = await fetch("/api/evidence", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fileBase64: base64,
+                sourceFile: file.name,
+                mimeType: file.type || undefined,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status})`);
+            result = mapEvidence(data);
           }
-          update(id, { status: "done", result: data as Result });
+          // Default: include unless Agnes suggests it's irrelevant.
+          update(id, {
+            status: "done",
+            result,
+            included: result.relevanceLevel !== "irrelevant",
+          });
         } catch (err) {
           update(id, { status: "error", error: (err as Error).message });
         }
@@ -124,24 +242,48 @@ export default function EvidenceUploader() {
     [update],
   );
 
-  const done = useMemo(
-    () => items.filter((i) => i.status === "done" && i.result).map((i) => i.result!),
+  const remove = useCallback(
+    (id: string) => setItems((prev) => prev.filter((i) => i.id !== id)),
+    [],
+  );
+  const clearAll = useCallback(() => {
+    if (confirm("Remove all uploaded files and results?")) setItems([]);
+  }, []);
+
+  // Only INCLUDED, successfully-processed files feed the timeline + export.
+  const included = useMemo(
+    () => items.filter((i) => i.status === "done" && i.included && i.result).map((i) => i.result!),
     [items],
   );
-  const timeline = useMemo(() => sortedTimeline(done), [done]);
+  const timeline = useMemo(() => sortedTimeline(included), [included]);
   const processing = items.some((i) => i.status === "processing");
 
   function buildBundle(): CaseEvidenceBundle {
     return {
       generatedAt: new Date().toISOString(),
-      evidence: done.map(({ indicativeNote: _omit, ...e }) => e),
+      evidence: included.map((r) => ({
+        sourceFile: r.sourceFile,
+        kind: r.kind === "audio" ? "document" : r.kind,
+        extractedText: r.text,
+        summary: r.summary,
+        timeline: r.timeline,
+        dates: r.dates,
+        amounts: r.amounts,
+        names: r.names,
+        language: r.language,
+        needsTranslation: r.needsTranslation,
+        relevance: r.relevance,
+        relevanceLevel: r.relevanceLevel,
+        quality: r.quality ?? { sufficient: true, confidence: 1, issues: [] },
+        evidenceLinked: false,
+      })),
       timeline,
       entities: {
-        dates: uniq(done.flatMap((r) => r.dates ?? [])),
-        amounts: uniq(done.flatMap((r) => r.amounts ?? [])),
-        names: uniq(done.flatMap((r) => r.names ?? [])),
+        dates: uniq(included.flatMap((r) => r.dates ?? [])),
+        amounts: uniq(included.flatMap((r) => r.amounts ?? [])),
+        names: uniq(included.flatMap((r) => r.names ?? [])),
       },
-      indicativeNote: done[0]?.indicativeNote ?? "",
+      indicativeNote: included[0]?.indicativeNote ?? "",
     };
   }
 
@@ -153,25 +295,6 @@ export default function EvidenceUploader() {
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-  }
-
-  function downloadBundle() {
-    download(
-      "case-evidence.json",
-      JSON.stringify(buildBundle(), null, 2),
-      "application/json",
-    );
-  }
-
-  function downloadTimeline() {
-    const lines = timeline.map(
-      (e) => `${e.date}\t${e.description}${e.sourceFile ? `  [${e.sourceFile}]` : ""}`,
-    );
-    download(
-      "case-timeline.txt",
-      `Case timeline (chronological)\n${"=".repeat(40)}\n\n${lines.join("\n")}\n`,
-      "text/plain;charset=utf-8",
-    );
   }
 
   const onDrop = useCallback(
@@ -186,7 +309,6 @@ export default function EvidenceUploader() {
 
   return (
     <div>
-      {/* Upload zone (multiple files) */}
       <div
         className={`dropzone${dragging ? " drag" : ""}`}
         onClick={() => inputRef.current?.click()}
@@ -204,8 +326,8 @@ export default function EvidenceUploader() {
       >
         <strong>Drop your evidence here, or click to choose</strong>
         <div className="hint">
-          Add as many files as you like — images, PDFs, Word (.docx), RTF or
-          text. Agnes reads each one and builds your case timeline.
+          Images, PDFs, Word (.docx), text or audio (mp3/wav/m4a…). Add as many
+          as you like — Agnes reads each one and builds your case timeline.
         </div>
         <input
           ref={inputRef}
@@ -221,41 +343,66 @@ export default function EvidenceUploader() {
         />
       </div>
 
-      {/* Per-file status list */}
       {items.length > 0 && (
         <div style={{ marginTop: "1.25rem" }}>
-          <p className="field-label">Files ({items.length})</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <p className="field-label" style={{ margin: 0, flex: 1 }}>
+              Files ({items.length})
+            </p>
+            <button className="btn" onClick={clearAll}>
+              Clear all
+            </button>
+          </div>
           {items.map((it) => (
-            <FileRow key={it.id} item={it} />
+            <FileRow
+              key={it.id}
+              item={it}
+              onRemove={() => remove(it.id)}
+              onToggle={() => update(it.id, { included: !it.included })}
+            />
           ))}
         </div>
       )}
 
-      {/* Combined, chronological case timeline */}
-      {done.length > 0 && (
+      {included.length > 0 && (
         <div className="card" style={{ marginTop: "1.5rem" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
             <h3 style={{ margin: 0, flex: 1 }}>
               Case timeline {processing ? "(building…)" : ""}
             </h3>
-            <button className="btn" onClick={downloadTimeline}>
+            <button
+              className="btn"
+              onClick={() => {
+                const lines = timeline.map(
+                  (e) =>
+                    `${e.date}\t${e.description}${e.sourceFile ? `  [${e.sourceFile}]` : ""}`,
+                );
+                download(
+                  "case-timeline.txt",
+                  `Case timeline (chronological)\n${"=".repeat(40)}\n\n${lines.join("\n")}\n`,
+                  "text/plain;charset=utf-8",
+                );
+              }}
+            >
               ↓ Timeline (.txt)
             </button>
-            <button className="btn btn-accent" onClick={downloadBundle}>
+            <button
+              className="btn btn-accent"
+              onClick={() =>
+                download(
+                  "case-evidence.json",
+                  JSON.stringify(buildBundle(), null, 2),
+                  "application/json",
+                )
+              }
+            >
               ↓ Case data (.json)
             </button>
           </div>
           <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.85rem" }}>
             {timeline.length} event{timeline.length === 1 ? "" : "s"} from{" "}
-            {done.length} file{done.length === 1 ? "" : "s"}, ordered earliest to
-            latest. Export the case data for the hearing-script step.
+            {included.length} included file{included.length === 1 ? "" : "s"},
+            ordered earliest to latest.
           </p>
 
           {timeline.length > 0 ? (
@@ -273,39 +420,66 @@ export default function EvidenceUploader() {
               ))}
             </ul>
           ) : (
-            <p className="muted">No dated events were found in these files.</p>
+            <p className="muted">No dated events were found in the included files.</p>
           )}
 
-          <EntityChips results={done} />
+          <EntityChips results={included} />
         </div>
       )}
     </div>
   );
 }
 
-function FileRow({ item }: { item: Item }) {
+const KIND_LABEL: Record<Extracted["kind"], string> = {
+  image: "Image",
+  document: "Document",
+  audio: "Audio",
+};
+
+const REL_BADGE: Record<RelevanceLevel, { label: string; cls: string }> = {
+  relevant: { label: "✓ relevant", cls: "badge-ok" },
+  uncertain: { label: "? uncertain", cls: "badge-warn" },
+  irrelevant: { label: "✕ looks irrelevant", cls: "badge-warn" },
+};
+
+function FileRow({
+  item,
+  onRemove,
+  onToggle,
+}: {
+  item: Item;
+  onRemove: () => void;
+  onToggle: () => void;
+}) {
   const r = item.result;
-  const ok = r?.quality?.sufficient;
+  const unreadable = r?.quality && r.quality.sufficient === false;
   return (
-    <div className="card" style={{ margin: "0.6rem 0" }}>
-      <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-        <span style={{ flex: 1, fontWeight: 600, wordBreak: "break-word" }}>
-          {item.name}
-        </span>
+    <div className="card" style={{ margin: "0.6rem 0", opacity: item.included ? 1 : 0.6 }}>
+      <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ flex: 1, fontWeight: 600, wordBreak: "break-word" }}>{item.name}</span>
+        {r && <span className="badge">{KIND_LABEL[r.kind]}</span>}
         {item.status === "processing" && (
           <span className="badge">
             <span className="spinner" /> reading…
           </span>
         )}
-        {item.status === "error" && (
-          <span className="badge badge-warn">⚠ failed</span>
-        )}
-        {item.status === "done" && (
-          <span className={`badge ${ok ? "badge-ok" : "badge-warn"}`}>
-            {ok ? "✓ read" : "⚠ unclear"}
+        {item.status === "error" && <span className="badge badge-warn">⚠ failed</span>}
+        {item.status === "done" && r?.relevanceLevel && (
+          <span className={`badge ${REL_BADGE[r.relevanceLevel].cls}`}>
+            {REL_BADGE[r.relevanceLevel].label}
           </span>
         )}
+        <button className="btn" onClick={onRemove} title="Remove this file">
+          Remove
+        </button>
       </div>
+
+      {item.status === "done" && (
+        <label style={{ display: "inline-flex", gap: "0.4rem", alignItems: "center", marginTop: "0.6rem", fontSize: "0.9rem" }}>
+          <input type="checkbox" checked={item.included} onChange={onToggle} />
+          Include in case timeline
+        </label>
+      )}
 
       {item.status === "error" && (
         <div className="flag error" style={{ marginTop: "0.75rem" }}>
@@ -315,10 +489,10 @@ function FileRow({ item }: { item: Item }) {
 
       {r && (
         <div style={{ marginTop: "0.75rem" }}>
-          {!ok && (
+          {unreadable && (
             <div className="flag" style={{ marginBottom: "0.75rem" }}>
-              <strong>This file may not be clear enough.</strong>
-              {r.quality?.issues?.length > 0 && (
+              <strong>This file may not be clear enough to read.</strong>
+              {r.quality?.issues && r.quality.issues.length > 0 && (
                 <ul>
                   {r.quality.issues.map((iss, i) => (
                     <li key={i}>{iss}</li>
@@ -333,6 +507,25 @@ function FileRow({ item }: { item: Item }) {
             </div>
           )}
 
+          {r.needsTranslation && (
+            <div className="flag" style={{ marginBottom: "0.75rem" }}>
+              Not in English — the SCT requires an English translation to be
+              submitted with this.
+            </div>
+          )}
+
+          {r.processingNote && (
+            <p className="muted" style={{ marginTop: 0 }}>
+              {r.processingNote}
+            </p>
+          )}
+
+          {r.relevance && (
+            <p className="muted" style={{ marginTop: 0 }}>
+              <strong>Relevance:</strong> {r.relevance}
+            </p>
+          )}
+
           {r.summary && (
             <>
               <p className="field-label">Summary</p>
@@ -340,12 +533,15 @@ function FileRow({ item }: { item: Item }) {
             </>
           )}
 
-          {/* Extracted text shown directly (this IS the image/file → text result) */}
           <p className="field-label">
-            Extracted text {r.kind === "image" ? "(read from image)" : ""}
+            {r.kind === "audio"
+              ? "Transcript"
+              : r.kind === "image"
+                ? "Extracted text (read from image)"
+                : "Extracted text"}
           </p>
-          {r.extractedText ? (
-            <pre className="transcript">{r.extractedText}</pre>
+          {r.text ? (
+            <pre className="transcript">{r.text}</pre>
           ) : (
             <p className="muted" style={{ margin: 0 }}>
               No text could be read from this file.
@@ -373,7 +569,7 @@ function Chips({ label, items }: { label: string; items: string[] }) {
   );
 }
 
-function EntityChips({ results }: { results: Result[] }) {
+function EntityChips({ results }: { results: Extracted[] }) {
   const dates = uniq(results.flatMap((r) => r.dates ?? []));
   const amounts = uniq(results.flatMap((r) => r.amounts ?? []));
   const names = uniq(results.flatMap((r) => r.names ?? []));

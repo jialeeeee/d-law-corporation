@@ -51,18 +51,21 @@ const SCHEMA_INSTRUCTIONS = [
   '  "dates": string[], "amounts": string[], "names": string[],',
   '  "language": string,        // e.g. "English", "Mandarin"',
   '  "needsTranslation": boolean, // true if NOT entirely in English',
-  '  "relevance": string,       // why this might matter to the claim',
+  '  "relevance": string,       // plainly: how this relates to a dispute. If it does NOT look like dispute evidence (e.g. study notes, an ad), say that here.',
+  '  "relevanceLevel": "relevant" | "uncertain" | "irrelevant", // your suggestion only',
   '  "sourceQuote": string,     // a short verbatim quote you relied on',
   '  "quality": {',
-  '    "sufficient": boolean,   // false if too blurry/incomplete to rely on',
-  '    "confidence": number,    // 0-1, your confidence in this extraction',
-  '    "issues": string[],      // concrete problems, empty if none',
-  '    "recommendation": string // how to fix it, or "" if fine',
+  '    "sufficient": boolean,   // LEGIBILITY ONLY. false ONLY if the text is blurry, cut off, or unreadable. NEVER false just because the content seems irrelevant.',
+  '    "confidence": number,    // 0-1, how completely you could read the text',
+  '    "issues": string[],      // readability problems only (e.g. "bottom cut off"); empty if legible',
+  '    "recommendation": string // how to get a more legible copy, or "" if legible',
   "  }",
   "}",
-  "Rules: never invent dates, names or amounts — copy them exactly. If the",
-  "material is unclear, partially unreadable, or empty, say so honestly in",
-  "quality.issues and set quality.sufficient to false. Keep dates verbatim.",
+  "Rules: never invent dates, names or amounts — copy them exactly. Keep dates",
+  "verbatim. Judge `quality` by LEGIBILITY ALONE — whether you could read the",
+  "text — NOT by whether the content is relevant. Put any relevance concern in",
+  "`relevance`/`relevanceLevel` only. If the material is genuinely unreadable or",
+  "empty, set quality.sufficient=false and explain in quality.issues.",
 ].join("\n");
 
 /** Defensively coerce model output into a complete, well-typed ModelExtract. */
@@ -86,6 +89,12 @@ function normalize(raw: Partial<ModelExtract> | null | undefined): ModelExtract 
     language: String(r.language ?? "Unknown"),
     needsTranslation: Boolean(r.needsTranslation),
     relevance: String(r.relevance ?? ""),
+    relevanceLevel:
+      r.relevanceLevel === "relevant" ||
+      r.relevanceLevel === "uncertain" ||
+      r.relevanceLevel === "irrelevant"
+        ? r.relevanceLevel
+        : undefined,
     sourceQuote: typeof r.sourceQuote === "string" ? r.sourceQuote : undefined,
     quality: {
       sufficient: q.sufficient !== false,
@@ -166,6 +175,8 @@ export async function POST(req: Request) {
 
   let model: ModelExtract;
   const extraIssues: string[] = [];
+  // Non-blocking note (e.g. AI analysis unavailable) — NOT a clarity problem.
+  let processingNote: string | undefined;
 
   try {
     if (cls.kind === "image") {
@@ -223,13 +234,20 @@ export async function POST(req: Request) {
           });
           model = normalize(out);
         } catch {
-          // Structuring failed (e.g. Agnes unavailable) — degrade gracefully.
-          model = normalize({ relevance: "" });
-          extraIssues.push(
-            "The text was extracted, but automatic summarising was unavailable, " +
-              "so only the raw text is shown.",
-          );
+          // Structuring (summary/timeline) failed — but the text WAS read fine.
+          // Degrade gracefully with a neutral note; do NOT flag it as unclear.
+          model = normalize({});
+          processingNote =
+            "Automatic summary and timeline were temporarily unavailable, so " +
+            "only the extracted text is shown. Remove and re-add this file to retry.";
         }
+        // The server extracted readable text, so legibility is confirmed: keep
+        // `quality` about clarity only (don't let a relevance call mark it bad).
+        model.quality = {
+          sufficient: true,
+          confidence: model.quality.confidence,
+          issues: [],
+        };
         // Always trust the verbatim server text over any model paraphrase.
         model.extractedText = text;
       }
@@ -255,6 +273,7 @@ export async function POST(req: Request) {
     // Stamp each timeline event with its source file so a combined, multi-file
     // timeline keeps provenance (which file each event came from).
     timeline: model.timeline.map((ev) => ({ ...ev, sourceFile: body.sourceFile })),
+    processingNote,
     sourceFile: body.sourceFile,
     kind: cls.kind,
     mimeType: cls.mimeType,
