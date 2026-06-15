@@ -1,17 +1,23 @@
 import Link from "next/link";
 import { login } from "../actions";
 
-// Functional (intentionally minimal) sign-in form. Donna: this is yours to style.
+// Sign-in form. Server component → posts to the `login` server action.
+// Field names (email, password, hidden next) are the contract — keep them.
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string; message?: string; next?: string }>;
 }) {
   const { error, message, next } = await searchParams;
+  const registerHref = next
+    ? `/register?next=${encodeURIComponent(next)}`
+    : "/register";
 
   return (
-    <div className="card auth-card">
-      <h1>Sign in</h1>
+    <div className="auth-card">
+      <h1>Welcome back</h1>
+      <p className="auth-sub">Sign in to continue preparing your case.</p>
+
       {error ? <p className="notice auth-error">{error}</p> : null}
       {message ? <p className="notice">{message}</p> : null}
 
@@ -20,7 +26,13 @@ export default async function LoginPage({
         <input type="hidden" name="next" value={next ?? ""} />
         <label>
           Email
-          <input name="email" type="email" autoComplete="email" required />
+          <input
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            required
+          />
         </label>
         <label>
           Password
@@ -28,14 +40,18 @@ export default async function LoginPage({
             name="password"
             type="password"
             autoComplete="current-password"
+            placeholder="••••••••"
             required
           />
         </label>
-        <button type="submit">Sign in</button>
+        <button type="submit" className="auth-submit">
+          Sign in
+        </button>
       </form>
 
-      <p className="muted">
-        No account? <Link href="/register">Create one</Link>
+      <p className="auth-alt">
+        Don&apos;t have an account?{" "}
+        <Link href={registerHref}>Create one</Link>
       </p>
     </div>
   );

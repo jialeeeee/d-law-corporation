@@ -68,10 +68,10 @@ export async function login(formData: FormData) {
 
 export async function register(formData: FormData) {
   const { email, password, fullName, next } = readCredentials(formData);
-  if (!isSupabaseConfigured) back("/register", NOT_CONFIGURED);
+  if (!isSupabaseConfigured) back("/register", NOT_CONFIGURED, next);
 
   const invalid = validate(email, password);
-  if (invalid) back("/register", invalid);
+  if (invalid) back("/register", invalid, next);
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -83,7 +83,7 @@ export async function register(formData: FormData) {
       data: fullName ? { full_name: fullName } : undefined,
     },
   });
-  if (error) back("/register", error.message);
+  if (error) back("/register", error.message, next);
 
   // When the project requires email confirmation, signUp returns no session.
   if (!data.session) {

@@ -432,57 +432,140 @@ pre.transcript {
   }
 }
 
-/* ── Auth forms (from main) ──────────────────────────────────────────────── */
-/* Auth forms (minimal — restyle freely). */
+/* ── Auth pages (login / register) ───────────────────────────────────────── */
+/* Full-height, centered shell with a soft branded backdrop. */
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.25rem;
+  background:
+    radial-gradient(1100px 520px at 50% -8%, rgba(0, 102, 204, 0.09), transparent 60%),
+    #ffffff;
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1.5rem;
+  text-decoration: none;
+}
+.auth-brand:hover {
+  text-decoration: none;
+}
+.auth-brand .logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0066cc, #0052a3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 6px 16px rgba(0, 102, 204, 0.3);
+}
+.auth-brand .wordmark {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #000000;
+}
+.auth-brand .tagline {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .auth-card {
+  width: 100%;
   max-width: 420px;
-  margin: 3rem auto;
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2.25rem 2rem;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.07);
+}
+/* Don't inherit the .card hover lift if combined. */
+.auth-card:hover {
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.07);
+}
+.auth-card h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.35rem;
+  text-align: center;
+}
+.auth-sub {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 0 0 1.5rem;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  margin: 1rem 0;
+  gap: 1rem;
+  margin: 0;
 }
-
 .auth-form label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.9rem;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.auth-optional {
+  font-weight: 400;
   color: var(--muted);
 }
 
-.auth-form input {
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 1rem;
-}
-
-.auth-form button {
-  padding: 0.6rem 1rem;
-  border: 0;
-  border-radius: 8px;
+.auth-submit {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.7rem 1rem;
   background: var(--accent);
   color: #ffffff;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.98rem;
   font-weight: 600;
-  font-size: 1rem;
   cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.auth-submit:hover {
+  background: #0052a3;
 }
 
-.link-button {
-  background: none;
-  color: var(--accent);
-  padding: 0;
-  font-weight: 400;
-  text-decoration: underline;
+.auth-alt {
+  margin: 1.5rem 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.auth-alt a {
+  font-weight: 600;
 }
 
+.auth-note {
+  margin-top: 1.5rem;
+  max-width: 420px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #999999;
+  line-height: 1.5;
+}
+
+/* Error / info banners inside the card. */
+.auth-card .notice {
+  margin: 0 0 1rem;
+}
 .auth-error {
-  border-left-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
+  border-left: 3px solid var(--danger);
+  background: #fdecea;
+  color: #b71c1c;
 }
