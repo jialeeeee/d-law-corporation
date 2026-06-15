@@ -43,6 +43,8 @@ Copy `.env.example` and fill in:
 | `AGNES_BASE_URL` | Agnes base URL | Defaults to `https://apihub.agnes-ai.com/v1`. |
 | `DATABASE_URL` | Supabase pooled connection (port 6543) | Used at runtime. |
 | `DIRECT_URL` | Supabase direct connection (port 5432) | Used by `prisma db push`. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (Auth) | **Browser-safe.** Settings → API. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (Auth) | **Browser-safe.** Settings → API. |
 
 `.env.local` is git-ignored — **never commit real secrets.** Ask the Lead for the real
 `AGNES_KEY` and Supabase URLs (shared out-of-band, not via git). The app builds and the dev
