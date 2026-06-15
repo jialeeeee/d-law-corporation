@@ -55,43 +55,93 @@ const SCHEMA = [
 const arr = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
+/** Map a Whisper language name/code to a display name. */
+function normLang(l?: string): string {
+  if (!l) return "Unknown";
+  const s = l.trim().toLowerCase();
+  const map: Record<string, string> = {
+    en: "English", eng: "English", english: "English",
+    zh: "Chinese", chinese: "Chinese", mandarin: "Chinese",
+    ms: "Malay", may: "Malay", malay: "Malay",
+    ta: "Tamil", tamil: "Tamil",
+  };
+  return map[s] ?? l.charAt(0).toUpperCase() + l.slice(1);
+}
+
+const isEnglish = (l?: string): boolean =>
+  /^en/i.test((l ?? "").trim()) || /english/i.test(l ?? "");
+
 export async function POST(req: Request) {
-  let body: TranscribeRequest & { mimeType?: string };
+  // Accept EITHER a streamed multipart upload (preferred — no size bloat, fixes
+  // large audio) OR a JSON body (back-compat). Both carry an optional `language`
+  // hint ("" / "auto" → auto-detect).
+  let sourceFile = "";
+  let mimeType: string | undefined;
+  let langHint: string | undefined;
+  let audioBlob: Blob | undefined;
+  let audioBase64: string | undefined;
+  let audioUrl: string | undefined;
+
+  const ctype = req.headers.get("content-type") ?? "";
   try {
-    body = await req.json();
+    if (ctype.includes("multipart/form-data")) {
+      const form = await req.formData();
+      const file = form.get("file");
+      if (file instanceof File) {
+        audioBlob = file;
+        sourceFile = file.name || "audio";
+        mimeType = file.type || undefined;
+      }
+      const lang = form.get("language");
+      langHint =
+        typeof lang === "string" && lang && lang !== "auto" ? lang : undefined;
+    } else {
+      const body = (await req.json()) as TranscribeRequest & {
+        mimeType?: string;
+        language?: string;
+      };
+      sourceFile = body.sourceFile ?? "";
+      mimeType = body.mimeType;
+      audioBase64 = body.audioBase64;
+      audioUrl = body.audioUrl;
+      langHint =
+        body.language && body.language !== "auto" ? body.language : undefined;
+    }
   } catch {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: "could not read the upload" }, { status: 400 });
   }
-  if (!body.sourceFile?.trim()) {
+
+  if (!sourceFile.trim()) {
     return NextResponse.json({ error: "sourceFile is required" }, { status: 400 });
   }
-  if (!body.audioBase64 && !body.audioUrl) {
+  if (!audioBlob && !audioBase64 && !audioUrl) {
     return NextResponse.json(
-      { error: "provide audioBase64 or audioUrl" },
+      { error: "provide an audio file (or audioBase64 / audioUrl)" },
       { status: 400 },
     );
   }
 
-  // Guard the upload size (base64 inflates ~33%).
-  if (body.audioBase64) {
-    const approxBytes = Math.floor((body.audioBase64.length * 3) / 4);
-    if (approxBytes > MAX_BYTES) {
-      return NextResponse.json(
-        { error: "audio exceeds 25 MB limit" },
-        { status: 413 },
-      );
-    }
+  // Size guard.
+  const approxBytes = audioBlob
+    ? audioBlob.size
+    : audioBase64
+      ? Math.floor((audioBase64.length * 3) / 4)
+      : 0;
+  if (approxBytes > MAX_BYTES) {
+    return NextResponse.json({ error: "audio exceeds 25 MB limit" }, { status: 413 });
   }
 
-  // 1) Transcribe (unconfirmed Agnes endpoint / swappable provider).
+  // 1) Transcribe (Whisper backend, swappable / env-configurable).
   let raw: string;
   let detectedLang: string | undefined;
   try {
     const out = await transcribe({
-      audioBase64: body.audioBase64,
-      audioUrl: body.audioUrl,
-      sourceFile: body.sourceFile,
-      mimeType: body.mimeType,
+      audioBlob,
+      audioBase64,
+      audioUrl,
+      sourceFile,
+      mimeType,
+      language: langHint,
     });
     raw = cleanText(out.text ?? "");
     detectedLang = out.language;
@@ -127,7 +177,7 @@ export async function POST(req: Request) {
   try {
     part = await chatJson<ModelPart>({
       system: `${rulesetToPrompt()}\n\n${SCHEMA}`,
-      user: `Transcript of ${body.sourceFile}:\n\n${raw}`,
+      user: `Transcript of ${sourceFile}:\n\n${raw}`,
       maxTokens: 4000,
     });
   } catch {
@@ -143,21 +193,20 @@ export async function POST(req: Request) {
     .map((t) => ({
       date: t.date,
       description: String(t.description ?? ""),
-      sourceFile: body.sourceFile,
+      sourceFile,
     }));
 
-  const language = part.language || detectedLang || "Unknown";
+  // The language ACTUALLY spoken: forced hint if given, else what Whisper
+  // detected. This is authoritative — never inferred from a translation.
+  const language = normLang(langHint ?? detectedLang ?? part.language);
   const transcript: Transcript = {
-    sourceFile: body.sourceFile,
+    sourceFile,
     kind: "audio",
     transcript: raw,
     summary: String(part.summary ?? ""),
     timeline,
     language,
-    needsTranslation:
-      typeof part.needsTranslation === "boolean"
-        ? part.needsTranslation
-        : !/^english/i.test(language),
+    needsTranslation: !isEnglish(language),
     dates: arr(part.dates),
     amounts: arr(part.amounts),
     names: arr(part.names),

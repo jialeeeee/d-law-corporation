@@ -118,9 +118,17 @@ export async function visionJson<T = unknown>(
 export interface TranscribeInput {
   audioUrl?: string;
   audioBase64?: string;
+  /** Streamed audio bytes (preferred for large files — avoids base64 bloat). */
+  audioBlob?: Blob;
   sourceFile: string;
   mimeType?: string;
   model?: string;
+  /**
+   * ISO-639-1 language hint (e.g. "en"). Forces Whisper to transcribe in that
+   * language — prevents mis-detecting clear English as another language. Leave
+   * undefined for auto-detect.
+   */
+  language?: string;
 }
 
 export interface RawTranscription {
@@ -133,6 +141,7 @@ export type TranscribeProvider = (
 ) => Promise<RawTranscription>;
 
 async function loadAudio(input: TranscribeInput): Promise<Blob> {
+  if (input.audioBlob) return input.audioBlob;
   if (input.audioBase64) {
     const bytes = new Uint8Array(Buffer.from(input.audioBase64, "base64"));
     return new Blob([bytes], {
@@ -186,6 +195,11 @@ const defaultTranscribe: TranscribeProvider = async (input) => {
       process.env.TRANSCRIBE_MODEL ??
       process.env.AGNES_AUDIO_MODEL ??
       "whisper-1",
+    // verbose_json returns the DETECTED language so we can report it accurately.
+    response_format: "verbose_json",
+    // A language hint forces transcription in that language (no mis-detection)
+    // and never translates (we use /transcriptions, never /translations).
+    ...(input.language ? { language: input.language } : {}),
   });
   return {
     text: (res as { text?: string }).text ?? "",

@@ -153,6 +153,9 @@ export default function EvidenceUploader() {
   const [items, setItems] = useState<Item[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // Spoken language for audio. Default English (SCT requires English) so clear
+  // English speech isn't mis-detected as another language.
+  const [audioLang, setAudioLang] = useState("en");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Load persisted items on mount (client only — avoids hydration mismatch).
@@ -199,22 +202,22 @@ export default function EvidenceUploader() {
         const file = files[i];
         const id = newItems[i].id;
         try {
-          const base64 = await fileToBase64(file);
           let result: Extracted;
           if (isAudio(file)) {
+            // Stream the audio file (multipart) — no base64 size limit. Pass the
+            // chosen language so Whisper doesn't mis-detect (e.g. English→Malay).
+            const form = new FormData();
+            form.append("file", file);
+            form.append("language", audioLang);
             const res = await fetch("/api/transcribe", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                audioBase64: base64,
-                sourceFile: file.name,
-                mimeType: file.type || undefined,
-              }),
+              body: form,
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status})`);
             result = mapTranscript(data);
           } else {
+            const base64 = await fileToBase64(file);
             const res = await fetch("/api/evidence", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -239,7 +242,7 @@ export default function EvidenceUploader() {
         }
       }
     },
-    [update],
+    [update, audioLang],
   );
 
   const remove = useCallback(
@@ -342,6 +345,35 @@ export default function EvidenceUploader() {
           }}
         />
       </div>
+
+      <label
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginTop: "0.9rem",
+          fontSize: "0.9rem",
+        }}
+      >
+        <span className="muted">Spoken language for audio:</span>
+        <select
+          value={audioLang}
+          onChange={(e) => setAudioLang(e.target.value)}
+          style={{
+            background: "var(--bg)",
+            color: "var(--text)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "0.35rem 0.5rem",
+          }}
+        >
+          <option value="en">English</option>
+          <option value="zh">Chinese</option>
+          <option value="ms">Malay</option>
+          <option value="ta">Tamil</option>
+          <option value="">Auto-detect</option>
+        </select>
+      </label>
 
       {items.length > 0 && (
         <div style={{ marginTop: "1.25rem" }}>
