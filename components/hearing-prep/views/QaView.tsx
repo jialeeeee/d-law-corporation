@@ -101,7 +101,13 @@ export function QaView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ evidence: payload }),
       });
-      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      if (!res.ok) {
+        const detail = await res
+          .json()
+          .then((d: { error?: string }) => d.error)
+          .catch(() => null);
+        throw new Error(detail || `Request failed (${res.status})`);
+      }
       const data = (await res.json()) as QaPrepApiResponse;
 
       const items: QaItem[] = (data.items ?? []).map((item, i) => ({
@@ -116,8 +122,11 @@ export function QaView() {
       setIndex(0);
       setReveal(false);
       showToast("Q&A generated", "quiz");
-    } catch {
-      showToast("Could not generate Q&A — try again", "error");
+    } catch (err) {
+      showToast(
+        (err as Error)?.message || "Could not generate Q&A — try again",
+        "error",
+      );
     } finally {
       setLoading(false);
     }

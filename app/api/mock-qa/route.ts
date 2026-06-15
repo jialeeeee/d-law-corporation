@@ -9,6 +9,12 @@ import type {
   CaseEvidenceBundle,
 } from "@/lib/types";
 
+// Agnes generations are slow (~up to 90s). Use the Node runtime and give the
+// function real headroom so the platform doesn't kill it before Agnes replies.
+// Keep maxDuration ≥ AGNES_TIMEOUT_MS (lib/agnes/client.ts).
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
 // Superset of MockQATurn — adds opponent questions and recommended answers.
 export type MockQATurnExtended = MockQATurn & {
   /** Whether this question comes from the Tribunal Magistrate or the opposing party. */
@@ -116,30 +122,38 @@ export async function POST(req: Request) {
   // Alternate questioner: even turns → magistrate, odd turns → opponent.
   const nextQuestioner = history.length % 2 === 0 ? "magistrate" : "opponent";
 
-  const result = await chatJson<MockQATurnExtended>({
-    system: [
-      rulesetToPrompt(),
-      "You are running a mock hearing session to help a self-represented litigant prepare for Singapore's Small Claims Tribunal.",
-      "The litigant's case is based entirely on the evidence extracted below — timelines, amounts, and names from their uploaded documents and audio.",
-      `For this turn, you are playing the role of the ${nextQuestioner === "magistrate" ? "Tribunal Magistrate" : "opposing party (respondent)"}.`,
-      "Base all questions ONLY on the evidence provided and prior exchanges. Do not invent new facts.",
-      "Return valid JSON matching this exact shape:",
-      '{ questionFrom: "magistrate"|"opponent", question: string, feedbackOnLastAnswer?: string, recommendedAnswer: string, tips: string[], done: boolean, indicativeNote: string }',
-      "Rules:",
-      `- questionFrom: "${nextQuestioner}"`,
-      nextQuestioner === "magistrate"
-        ? '- question: A probing question a Tribunal Magistrate would ask — challenge dates, amounts, how the litigant knows a fact, what evidence supports each claim. Examples: "How do you know X?", "Where is your proof of Y?", "Explain this amount."'
-        : '- question: A challenging question the opposing party would raise — dispute the litigant\'s version of events, question the amount, or highlight gaps in their evidence.',
-      "- feedbackOnLastAnswer: Constructive feedback on the litigant's last answer (clarity, use of evidence, completeness). Omit on the very first turn.",
-      "- recommendedAnswer: A model answer the litigant could give — factual, concise, grounded in the evidence provided.",
-      "- tips: 2–3 brief tips specific to handling this type of question well.",
-      `- done: Set to true only after at least 6 exchanges AND all key facts from the evidence have been covered. Current exchange count: ${history.length}.`,
-      "- indicativeNote: Copy exactly: " + JSON.stringify(INDICATIVE_NOTE),
-    ].join("\n"),
-    user:
-      `EVIDENCE FROM TRACK A:\n\n${caseContext}${historyContext}` +
-      (lastAnswer ? `\n\nLITIGANT'S LAST ANSWER:\n${lastAnswer}` : ""),
-  });
+  let result: MockQATurnExtended;
+  try {
+    result = await chatJson<MockQATurnExtended>({
+      system: [
+        rulesetToPrompt(),
+        "You are running a mock hearing session to help a self-represented litigant prepare for Singapore's Small Claims Tribunal.",
+        "The litigant's case is based entirely on the evidence extracted below — timelines, amounts, and names from their uploaded documents and audio.",
+        `For this turn, you are playing the role of the ${nextQuestioner === "magistrate" ? "Tribunal Magistrate" : "opposing party (respondent)"}.`,
+        "Base all questions ONLY on the evidence provided and prior exchanges. Do not invent new facts.",
+        "Return valid JSON matching this exact shape:",
+        '{ questionFrom: "magistrate"|"opponent", question: string, feedbackOnLastAnswer?: string, recommendedAnswer: string, tips: string[], done: boolean, indicativeNote: string }',
+        "Rules:",
+        `- questionFrom: "${nextQuestioner}"`,
+        nextQuestioner === "magistrate"
+          ? '- question: A probing question a Tribunal Magistrate would ask — challenge dates, amounts, how the litigant knows a fact, what evidence supports each claim. Examples: "How do you know X?", "Where is your proof of Y?", "Explain this amount."'
+          : '- question: A challenging question the opposing party would raise — dispute the litigant\'s version of events, question the amount, or highlight gaps in their evidence.',
+        "- feedbackOnLastAnswer: Constructive feedback on the litigant's last answer (clarity, use of evidence, completeness). Omit on the very first turn.",
+        "- recommendedAnswer: A model answer the litigant could give — factual, concise, grounded in the evidence provided.",
+        "- tips: 2–3 brief tips specific to handling this type of question well.",
+        `- done: Set to true only after at least 6 exchanges AND all key facts from the evidence have been covered. Current exchange count: ${history.length}.`,
+        "- indicativeNote: Copy exactly: " + JSON.stringify(INDICATIVE_NOTE),
+      ].join("\n"),
+      user:
+        `EVIDENCE FROM TRACK A:\n\n${caseContext}${historyContext}` +
+        (lastAnswer ? `\n\nLITIGANT'S LAST ANSWER:\n${lastAnswer}` : ""),
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Mock Q&A generation failed: ${(err as Error).message}` },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({ ...result, indicativeNote: INDICATIVE_NOTE });
 }

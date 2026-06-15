@@ -5,6 +5,7 @@
 // from the included evidence), the hearing-day checklist, and a tip callout.
 
 import { useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useWorkspace } from "@/lib/store/WorkspaceProvider";
 import { useUI, Icon } from "@/components/hearing-prep/ui";
 import type { CaseData, ScriptSection } from "@/lib/store/types";
@@ -29,6 +30,74 @@ interface ScriptEvidencePayload {
   evidenceLinked: boolean;
 }
 
+// Build the display strings the cards show from a yyyy-mm-dd date + HH:mm time.
+// Kept here (not in the store) because only this view formats hearing details.
+function formatHearingDate(date: string): string {
+  if (!date) return "To be assigned";
+  // Parse as a local date (no timezone shift) so the chosen day is preserved.
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return "To be assigned";
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatHearingTime(time: string): string {
+  if (!time) return "";
+  const [h, min] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(min)) return "";
+  const period = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(min).padStart(2, "0")} ${period}`;
+}
+
+// Recover the yyyy-mm-dd / HH:mm input values from a stored hearing ISO string.
+function isoToInputs(iso: string): { date: string; time: string } {
+  if (!iso) return { date: "", time: "" };
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return { date: "", time: "" };
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`,
+    time: `${pad(dt.getHours())}:${pad(dt.getMinutes())}`,
+  };
+}
+
+// Shared input styling + a small labelled-field wrapper for the editor grid.
+const fieldStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 14,
+  fontFamily: "inherit",
+  color: "var(--ink)",
+  background: "var(--surface)",
+  boxSizing: "border-box",
+};
+
+function editField(label: string, control: ReactNode) {
+  return (
+    <label style={{ display: "block" }}>
+      <span
+        style={{
+          display: "block",
+          fontSize: 12.5,
+          fontWeight: 700,
+          color: "var(--ink-mute)",
+          letterSpacing: ".04em",
+          marginBottom: 7,
+        }}
+      >
+        {label}
+      </span>
+      {control}
+    </label>
+  );
+}
+
 export function HearingsView() {
   const { activeCase, updateActive } = useWorkspace();
   const { setView, showToast } = useUI();
@@ -41,6 +110,46 @@ export function HearingsView() {
   const days = c.hearingISO
     ? Math.max(0, Math.ceil((new Date(c.hearingISO).getTime() - Date.now()) / 86400000))
     : null;
+
+  // ── Editable hearing details (date / time / location) ──────────────────────
+  // Treat the "To be assigned" placeholder as empty so the inputs start blank.
+  const unplaceholder = (v: string) => (v === "To be assigned" ? "" : v);
+  const [editing, setEditing] = useState(false);
+  const init = isoToInputs(c.hearingISO);
+  const [date, setDate] = useState(init.date);
+  const [time, setTime] = useState(init.time);
+  const [room, setRoom] = useState(unplaceholder(c.room));
+  const [tribunal, setTribunal] = useState(unplaceholder(c.tribunal));
+
+  function openEditor() {
+    const cur = isoToInputs(c.hearingISO);
+    setDate(cur.date);
+    setTime(cur.time);
+    setRoom(unplaceholder(c.room));
+    setTribunal(unplaceholder(c.tribunal));
+    setEditing(true);
+  }
+
+  function saveDetails() {
+    // Combine date + time into a local ISO for the countdown; default the time
+    // to midnight if only a date is given so the countdown still works.
+    const iso = date
+      ? new Date(`${date}T${time || "00:00"}`).toISOString()
+      : "";
+    updateActive((cd: CaseData) => ({
+      ...cd,
+      meta: {
+        ...cd.meta,
+        hearingISO: iso,
+        hearingDate: formatHearingDate(date),
+        hearingTime: formatHearingTime(time),
+        room: room.trim() || "To be assigned",
+        tribunal: tribunal.trim() || "To be assigned",
+      },
+    }));
+    setEditing(false);
+    showToast("Hearing details saved", "event_available");
+  }
 
   const checklist = activeCase.checklist;
   const doneCount = checklist.filter((x) => x.done).length;
@@ -80,7 +189,13 @@ export function HearingsView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ evidence: payload }),
       });
-      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      if (!res.ok) {
+        const detail = await res
+          .json()
+          .then((d: { error?: string }) => d.error)
+          .catch(() => null);
+        throw new Error(detail || `Request failed (${res.status})`);
+      }
       const script = (await res.json()) as HearingScript;
 
       const secs: ScriptSection[] = [
@@ -100,8 +215,11 @@ export function HearingsView() {
         scriptReviewed: false,
       }));
       showToast("Script generated", "menu_book");
-    } catch {
-      showToast("Could not generate the script — try again", "error");
+    } catch (err) {
+      showToast(
+        (err as Error)?.message || "Could not generate the script — try again",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
@@ -134,13 +252,132 @@ export function HearingsView() {
   return (
     <div className="dl-view">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div className="dl-eyebrow">Hearing day</div>
-        <h1 className="dl-h1">Prepare what you&apos;ll say</h1>
-        <p className="dl-sub">
-          Read your script aloud, then tick off everything you need on the day.
-        </p>
+      <div
+        style={{
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 16,
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div className="dl-eyebrow">Hearing day</div>
+          <h1 className="dl-h1">Prepare what you&apos;ll say</h1>
+          <p className="dl-sub">
+            Read your script aloud, then tick off everything you need on the day.
+          </p>
+        </div>
+        {!editing && (
+          <button
+            onClick={openEditor}
+            className="dl-btn dl-btn-ghost"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              color: "var(--ink)",
+              borderRadius: 10,
+              padding: "9px 14px",
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Icon name="edit_calendar" size={18} color="var(--teal)" />
+            Edit hearing details
+          </button>
+        )}
       </div>
+
+      {/* Editor — set hearing date / time / location */}
+      {editing && (
+        <div className="dl-card" style={{ padding: 24, marginBottom: 18 }}>
+          <div className="dl-card-title" style={{ marginBottom: 16 }}>
+            Hearing details
+          </div>
+          <div
+            className="dl-grid"
+            style={{
+              gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
+              gap: 16,
+            }}
+          >
+            {editField("Date", (
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                style={fieldStyle}
+              />
+            ))}
+            {editField("Time", (
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                style={fieldStyle}
+              />
+            ))}
+            {editField("Room / unit", (
+              <input
+                type="text"
+                value={room}
+                placeholder="e.g. Tribunal Room 4"
+                onChange={(e) => setRoom(e.target.value)}
+                style={fieldStyle}
+              />
+            ))}
+            {editField("Tribunal / location", (
+              <input
+                type="text"
+                value={tribunal}
+                placeholder="e.g. State Courts, Havelock Square"
+                onChange={(e) => setTribunal(e.target.value)}
+                style={fieldStyle}
+              />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button
+              onClick={saveDetails}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                border: "none",
+                background: "var(--teal)",
+                color: "#fff",
+                borderRadius: 10,
+                padding: "10px 18px",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              <Icon name="check" size={18} color="#fff" />
+              Save details
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                color: "var(--ink-soft)",
+                borderRadius: 10,
+                padding: "10px 18px",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stat row */}
       <div

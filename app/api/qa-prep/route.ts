@@ -7,6 +7,12 @@ import type {
   CaseEvidenceBundle,
 } from "@/lib/types";
 
+// Agnes generations are slow (~up to 90s). Use the Node runtime and give the
+// function real headroom so the platform doesn't kill it before Agnes replies.
+// Keep maxDuration ≥ AGNES_TIMEOUT_MS (lib/agnes/client.ts).
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
 // Generates a prepared batch of likely tribunal Q&A from the case evidence.
 // The design's Q&A screen seeds its list from this endpoint. Modelled on
 // app/api/mock-qa/route.ts conventions (USE_MOCK, bundle/evidence context,
@@ -138,23 +144,31 @@ export async function POST(req: Request) {
     ? buildBundleContext(bundle)
     : buildEvidenceContext(evidence!);
 
-  const result = await chatJson<QaPrepModelResult>({
-    system: [
-      rulesetToPrompt(),
-      "You are helping a self-represented litigant at Singapore's Small Claims Tribunal " +
-        "prepare for the questions they are likely to face at the hearing.",
-      "Use the timelines, summaries, amounts, and names extracted from the evidence below as the SOLE source of facts.",
-      "Do NOT invent facts, names, dates, or amounts that are not present in the evidence.",
-      "Return valid JSON matching this exact shape:",
-      '{ items: [{ question: string, answer: string, tip: string }] }',
-      "Rules:",
-      "- items: 8 to 10 questions a Tribunal Magistrate or the opposing party is likely to ask, ordered most-likely first.",
-      "- question: A realistic, probing question — challenge dates, amounts, how the litigant knows a fact, or what evidence supports each claim.",
-      "- answer: A concise model answer GROUNDED ONLY in the provided evidence. Reference the specific document/amount/date it relies on. Never invent facts.",
-      "- tip: One short, practical line on how to handle that question well in the hearing.",
-    ].join("\n"),
-    user: `EVIDENCE FROM TRACK A:\n\n${caseContext}`,
-  });
+  let result: QaPrepModelResult;
+  try {
+    result = await chatJson<QaPrepModelResult>({
+      system: [
+        rulesetToPrompt(),
+        "You are helping a self-represented litigant at Singapore's Small Claims Tribunal " +
+          "prepare for the questions they are likely to face at the hearing.",
+        "Use the timelines, summaries, amounts, and names extracted from the evidence below as the SOLE source of facts.",
+        "Do NOT invent facts, names, dates, or amounts that are not present in the evidence.",
+        "Return valid JSON matching this exact shape:",
+        '{ items: [{ question: string, answer: string, tip: string }] }',
+        "Rules:",
+        "- items: 8 to 10 questions a Tribunal Magistrate or the opposing party is likely to ask, ordered most-likely first.",
+        "- question: A realistic, probing question — challenge dates, amounts, how the litigant knows a fact, or what evidence supports each claim.",
+        "- answer: A concise model answer GROUNDED ONLY in the provided evidence. Reference the specific document/amount/date it relies on. Never invent facts.",
+        "- tip: One short, practical line on how to handle that question well in the hearing.",
+      ].join("\n"),
+      user: `EVIDENCE FROM TRACK A:\n\n${caseContext}`,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Q&A generation failed: ${(err as Error).message}` },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json<QaPrepResponse>({
     items: result.items ?? [],

@@ -26,17 +26,23 @@ const JSON_GUARD =
 let _client: OpenAI | null = null;
 
 /**
- * How long to wait for an Agnes chat/vision response before failing (ms). Without
- * this the SDK default is 10 MINUTES with 2 retries, so a slow/flaky Agnes call
- * hangs the upload request until the browser gives up with "Failed to fetch".
- * One bounded retry keeps a clear error arriving in well under a minute instead.
+ * How long to wait for an Agnes chat/vision response before failing (ms).
+ *
+ * Agnes latency is high and VERY inconsistent — measured 10s for a trivial reply
+ * but up to ~90s for a large JSON generation (the real hearing-script / qa-prep /
+ * mock-qa calls that send big evidence context + max_tokens:4000). The old 60s
+ * cap aborted those valid-but-slow responses, surfacing as generic "could not
+ * generate" errors. Default to 120s and allow an override via AGNES_TIMEOUT_MS.
+ *
+ * NOTE: keep this in sync with `maxDuration` exported by the route handlers, and
+ * with the platform function limit (Vercel caps serverless duration by plan).
  */
-const AGNES_TIMEOUT_MS = 60_000;
+const AGNES_TIMEOUT_MS = Number(process.env.AGNES_TIMEOUT_MS) || 120_000;
 
 /** Lazily construct the OpenAI-compatible client pointed at Agnes. */
 function client(): OpenAI {
   if (_client) return _client;
-  const apiKey = process.env.AGNES_KEY;
+  const apiKey = process.env.AGNES_KEY?.trim();
   if (!apiKey) {
     throw new Error(
       "AGNES_KEY is not set. Add it to .env.local (server-side only) — see .env.example.",
@@ -48,7 +54,10 @@ function client(): OpenAI {
     // Bound the wait so a slow Agnes returns a clean 502 (handled → toast)
     // instead of hanging long enough for the browser to throw "Failed to fetch".
     timeout: AGNES_TIMEOUT_MS,
-    maxRetries: 1,
+    // No retry: a retry just doubles the already-long wait before failing, and on
+    // a 90s timeout that risks tripping the platform's function limit. Fail once,
+    // fast and clear, and let the user re-trigger.
+    maxRetries: 0,
   });
   return _client;
 }
@@ -181,7 +190,7 @@ let _transcribeClient: OpenAI | null = null;
 /** Lazily build the (possibly separate) client used for audio transcription. */
 function transcribeClient(): OpenAI {
   if (_transcribeClient) return _transcribeClient;
-  const apiKey = process.env.TRANSCRIBE_API_KEY ?? process.env.AGNES_KEY;
+  const apiKey = (process.env.TRANSCRIBE_API_KEY ?? process.env.AGNES_KEY)?.trim();
   if (!apiKey) {
     throw new Error(
       "No transcription API key. Set TRANSCRIBE_API_KEY (or AGNES_KEY) in .env.local.",

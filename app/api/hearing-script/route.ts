@@ -8,6 +8,12 @@ import type {
   CaseEvidenceBundle,
 } from "@/lib/types";
 
+// Agnes generations are slow (~up to 90s). Use the Node runtime and give the
+// function real headroom so the platform doesn't kill it before Agnes replies.
+// Keep maxDuration ≥ AGNES_TIMEOUT_MS (lib/agnes/client.ts).
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
 // Accepts either the CaseEvidenceBundle handoff from Track A (preferred)
 // or raw arrays for flexibility during development.
 export interface HearingScriptFromEvidenceRequest {
@@ -117,23 +123,31 @@ export async function POST(req: Request) {
     ? buildBundleContext(bundle)
     : buildEvidenceContext(evidence!);
 
-  const result = await chatJson<HearingScript>({
-    system: [
-      rulesetToPrompt(),
-      "You are helping a self-represented litigant at Singapore's Small Claims Tribunal " +
-        "prepare a court-ready hearing script from their uploaded evidence.",
-      "Use the timelines, summaries, amounts, and names extracted from the evidence as the SOLE source of facts.",
-      "Do NOT invent facts, names, dates, or amounts that are not present in the evidence.",
-      "Return valid JSON matching this exact shape:",
-      "{ opening: string, chronology: [{ heading: string, content: string, evidenceRefs?: string[] }], reliefSought: string, indicativeNote: string }",
-      "Rules:",
-      "- opening: 2–3 sentences — who the litigant is, what happened, what they are claiming.",
-      "- chronology: Events in strict date order from the timeline. Each entry must reference the sourceFile it came from in evidenceRefs.",
-      "- reliefSought: The exact remedy (e.g. 'Refund of $X for Y'). Derive only from amounts found in the evidence.",
-      "- indicativeNote: Copy exactly: " + JSON.stringify(INDICATIVE_NOTE),
-    ].join("\n"),
-    user: `EVIDENCE FROM TRACK A:\n\n${context}`,
-  });
+  let result: HearingScript;
+  try {
+    result = await chatJson<HearingScript>({
+      system: [
+        rulesetToPrompt(),
+        "You are helping a self-represented litigant at Singapore's Small Claims Tribunal " +
+          "prepare a court-ready hearing script from their uploaded evidence.",
+        "Use the timelines, summaries, amounts, and names extracted from the evidence as the SOLE source of facts.",
+        "Do NOT invent facts, names, dates, or amounts that are not present in the evidence.",
+        "Return valid JSON matching this exact shape:",
+        "{ opening: string, chronology: [{ heading: string, content: string, evidenceRefs?: string[] }], reliefSought: string, indicativeNote: string }",
+        "Rules:",
+        "- opening: 2–3 sentences — who the litigant is, what happened, what they are claiming.",
+        "- chronology: Events in strict date order from the timeline. Each entry must reference the sourceFile it came from in evidenceRefs.",
+        "- reliefSought: The exact remedy (e.g. 'Refund of $X for Y'). Derive only from amounts found in the evidence.",
+        "- indicativeNote: Copy exactly: " + JSON.stringify(INDICATIVE_NOTE),
+      ].join("\n"),
+      user: `EVIDENCE FROM TRACK A:\n\n${context}`,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Hearing script generation failed: ${(err as Error).message}` },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({ ...result, indicativeNote: INDICATIVE_NOTE });
 }

@@ -8,8 +8,12 @@
 // it returns a warning instead, so the route can flag the upload as "needs a
 // cleaner copy" rather than 500-ing (agent.md §0 — flag insufficient evidence).
 import "server-only";
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+// NOTE: `mammoth` and `pdf-parse` are imported LAZILY (dynamic import inside the
+// functions that use them) — NOT at the top level. A static import runs at module
+// load, and these libraries crash on import in some serverless runtimes (Vercel),
+// which would take down the whole /api/evidence route — even for image uploads
+// that never need them. Loading them only when a PDF/DOCX is actually parsed
+// keeps the route booting cleanly and confines any failure to the doc branch.
 
 export type EvidenceFileKind = "image" | "document" | "unsupported";
 
@@ -161,7 +165,9 @@ export function cleanText(raw: string): string {
 
 async function extractPdf(buf: Buffer): Promise<TextExtraction> {
   // pdf-parse v2 exposes a PDFParse class backed by pdfjs-dist. Pass the bytes
-  // as a Uint8Array; always destroy() to release the worker.
+  // as a Uint8Array; always destroy() to release the worker. Loaded lazily (see
+  // the note at the top of this file).
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: new Uint8Array(buf) });
   let text: string;
   try {
@@ -189,6 +195,8 @@ async function extractPdf(buf: Buffer): Promise<TextExtraction> {
 }
 
 async function extractDocx(buf: Buffer): Promise<TextExtraction> {
+  // Loaded lazily (see the note at the top of this file).
+  const mammoth = (await import("mammoth")).default;
   const { value } = await mammoth.extractRawText({ buffer: buf });
   const text = cleanText(value ?? "");
   const warnings: string[] = [];
