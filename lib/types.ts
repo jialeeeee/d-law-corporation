@@ -128,6 +128,29 @@ export interface TranscribeRequest {
   sourceFile: string;
 }
 
+/**
+ * The handoff artifact from Feature 2 → Feature 6. After the user uploads all
+ * their evidence, this bundles every extract plus one merged, chronologically
+ * ordered timeline and de-duplicated entities. Track B (hearing script / mock
+ * Q&A) consumes this as the structured source for building the case narrative.
+ */
+export interface CaseEvidenceBundle {
+  /** ISO timestamp the bundle was generated. */
+  generatedAt: string;
+  /** Per-file structured extracts. */
+  evidence: EvidenceExtract[];
+  /** All timeline events across files, ordered earliest → latest. */
+  timeline: TimelineEvent[];
+  /** De-duplicated entities gathered across all evidence. */
+  entities: {
+    dates: string[];
+    amounts: string[];
+    names: string[];
+  };
+  /** Not-legal-advice line (agent.md §0.1). */
+  indicativeNote: string;
+}
+
 // ─────────────────── Feature 6 — Hearing script + mock Q&A ───────────────────
 
 export interface HearingScriptSection {

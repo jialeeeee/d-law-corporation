@@ -21,6 +21,7 @@ import {
   classifyEvidence,
   cleanText,
   extractDocumentText,
+  sniffKind,
 } from "@/lib/evidence/extractText";
 import type {
   EvidenceExtract,
@@ -137,12 +138,25 @@ export async function POST(req: Request) {
     );
   }
 
-  const cls = classifyEvidence(body.sourceFile, body.mimeType);
+  // Load the bytes once; needed for sniffing, vision and document extraction.
+  let buf: Buffer;
+  try {
+    buf = await loadBytes(body);
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+  }
+
+  // Classify by name/MIME, then fall back to magic-byte sniffing so a file with
+  // a missing or wrong extension/MIME type still gets handled correctly.
+  let cls = classifyEvidence(body.sourceFile, body.mimeType);
+  if (cls.kind === "unsupported") {
+    cls = sniffKind(buf) ?? cls;
+  }
   if (cls.kind === "unsupported") {
     return NextResponse.json(
       {
         error:
-          "Unsupported file type. Upload an image (PNG/JPG/WebP), PDF, DOCX or text file.",
+          "Unsupported file type. Upload an image (PNG/JPG/WebP/HEIC), PDF, Word (.docx), RTF or text file.",
       },
       { status: 415 },
     );
@@ -157,7 +171,6 @@ export async function POST(req: Request) {
     if (cls.kind === "image") {
       // Images have no server-side text layer — Agnes vision IS the OCR. Ask for
       // a verbatim transcription so extractedText stays as accurate as possible.
-      const buf = await loadBytes(body);
       const dataUrl = `data:${cls.mimeType};base64,${buf.toString("base64")}`;
       const out = await visionJson<Partial<ModelExtract>>({
         system: grounding,
@@ -181,7 +194,6 @@ export async function POST(req: Request) {
       // paraphrase = accurate, verbatim, good provenance). Agnes only adds the
       // summary/timeline/entities on top — and if that call fails we still
       // return the raw text rather than erroring out (bulletproof path).
-      const buf = await loadBytes(body);
       const { text, warnings } = await extractDocumentText(
         buf,
         cls.docType ?? "text",
@@ -229,16 +241,20 @@ export async function POST(req: Request) {
     );
   }
 
-  // Fold any server-side warnings (e.g. scanned PDF) into the quality flag.
+  // Fold any server-side warnings (e.g. scanned PDF) into the quality flag,
+  // de-duplicating so a message added in both places isn't shown twice.
   if (extraIssues.length) {
     model.quality.sufficient = false;
-    model.quality.issues = [...extraIssues, ...model.quality.issues];
+    model.quality.issues = [...new Set([...extraIssues, ...model.quality.issues])];
     model.quality.recommendation ??=
       "Upload a clearer copy so the full text can be read.";
   }
 
   const extract: EvidenceExtract = {
     ...model,
+    // Stamp each timeline event with its source file so a combined, multi-file
+    // timeline keeps provenance (which file each event came from).
+    timeline: model.timeline.map((ev) => ({ ...ev, sourceFile: body.sourceFile })),
     sourceFile: body.sourceFile,
     kind: cls.kind,
     mimeType: cls.mimeType,

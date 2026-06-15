@@ -1,6 +1,6 @@
 # Justifi — agent.md
 
-**Doc version: v0.2.0** · see [Changelog](#changelog) for history.
+**Doc version: v0.3.0** · see [Changelog](#changelog) for history.
 
 **Mission:** help self-represented litigants at Singapore's Small Claims Tribunal (SCT)
 turn their own account into a clear, court-ready case — eligibility, evidence, claim value,
@@ -18,7 +18,8 @@ Bump this on every meaningful change so we can trace what moved and when (newest
 
 | Version | Date | Change |
 | --- | --- | --- |
-| **v0.2.0** | 2026-06-15 | **F2 Evidence organiser — documents implemented** (branch `feat/evidence-docs`). `POST /api/evidence` now accepts **images (PNG/JPG/WebP), PDF, DOCX and text**. Images go to Agnes vision; PDF/DOCX/text are extracted server-side (`lib/evidence/extractText.ts`, via `pdf-parse` + `mammoth`) then structured by Agnes. Adds an **extraction-quality flag** (`ExtractionQuality`) that raises poor/incomplete uploads to the user, a full-text **transcript download**, timeline + entity extraction, and the non-English translation flag. New shared types: `ExtractionQuality`, `EvidenceKind` gains `"document"`, `EvidenceExtract` gains `kind:"image"\|"document"`, `mimeType`, `quality`; `EvidenceRequest` gains `fileBase64`/`fileUrl`/`mimeType` (image fields kept as aliases). Wizard UI step 1 now live (`app/(web)/wizard/EvidenceUploader.tsx`). |
+| **v0.3.0** | 2026-06-15 | **F2 → multi-file case timeline + Track B handoff.** The wizard now accepts **many files at once**; Agnes extracts each, and the UI merges every dated event into **one chronological case timeline** (de-duplicated dates/amounts/names). New **export**: `case-evidence.json` (`CaseEvidenceBundle`) and `case-timeline.txt` — the structured handoff Track B (hearing script / mock Q&A) builds the narrative from. **Bulletproof file types:** added more image formats (HEIC/HEIF/AVIF), `.rtf`, graceful legacy `.doc` flag, and **magic-byte sniffing** so files with a missing/wrong extension still work. Timeline events now carry `sourceFile` (provenance). New shared type `CaseEvidenceBundle`. **Fix:** `serverExternalPackages: ["pdf-parse","mammoth","pdfjs-dist"]` in `next.config.mjs` — these were being webpack-bundled and crashed `/api/evidence` with a 500 ("Object.defineProperty called on non-object") for every upload. |
+| v0.2.0 | 2026-06-15 | **F2 Evidence organiser — documents implemented** (branch `feat/evidence-docs`). `POST /api/evidence` now accepts **images (PNG/JPG/WebP), PDF, DOCX and text**. Images go to Agnes vision; PDF/DOCX/text are extracted server-side (`lib/evidence/extractText.ts`, via `pdf-parse` + `mammoth`) then structured by Agnes. Adds an **extraction-quality flag** (`ExtractionQuality`) that raises poor/incomplete uploads to the user, a full-text **transcript download**, timeline + entity extraction, and the non-English translation flag. New shared types: `ExtractionQuality`, `EvidenceKind` gains `"document"`, `EvidenceExtract` gains `kind:"image"\|"document"`, `mimeType`, `quality`; `EvidenceRequest` gains `fileBase64`/`fileUrl`/`mimeType` (image fields kept as aliases). Wizard UI step 1 now live (`app/(web)/wizard/EvidenceUploader.tsx`). |
 | v0.1.0 | 2026-06-15 | Foundation on `main`: Next.js scaffold, Agnes client (`chatJson`/`visionJson`/`transcribe`), SCT ruleset, Prisma schema, shared contracts; F2/F6 scoped; API routes as 501 stubs. |
 
 ---
@@ -143,7 +144,7 @@ Rule of thumb: **work only inside your own folder.** The only shared files are
 `lib/types.ts` is the single source of truth. When your feature needs a new type, the **Lead adds it
 there via a tiny PR**, then you import it. Active types:
 
-- F2: `EvidenceExtract`, `ExtractionQuality`, `Transcript`, `MaterialFact`, `TimelineEvent`, `EvidenceRequest`, `TranscribeRequest`, `EvidenceKind` (`"image"|"document"|"audio"`)
+- F2: `EvidenceExtract`, `ExtractionQuality`, `CaseEvidenceBundle` (F2→F6 handoff), `Transcript`, `MaterialFact`, `TimelineEvent`, `EvidenceRequest`, `TranscribeRequest`, `EvidenceKind` (`"image"|"document"|"audio"`)
 - F6: `HearingScript`, `HearingScriptSection`, `MockQATurn`, `MockQAExchange`, `HearingScriptRequest`, `MockQARequest`
 
 ---

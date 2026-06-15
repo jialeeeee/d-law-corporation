@@ -13,11 +13,13 @@ export default function WizardPage() {
       </p>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>1 · Evidence &amp; documents</h3>
+        <h3 style={{ marginTop: 0 }}>1 · Evidence &amp; timeline</h3>
         <p className="muted" style={{ marginTop: 0 }}>
-          Upload an image, PDF, Word document or text file and Justifi extracts
-          the text for you. If a file is too blurry or unreadable, it&apos;s
-          flagged so you can re-upload a cleaner copy.
+          Upload all of your evidence — images, PDFs, Word documents or text.
+          Agnes AI reads each file, pulls out the key facts and dated events, and
+          builds a single timeline ordered from earliest to latest. Unclear files
+          are flagged so you can re-upload a cleaner copy. Export the case data to
+          carry into the hearing-script step.
         </p>
         <EvidenceUploader />
       </div>
